@@ -91,9 +91,7 @@ class TruncatedSVD(DecompositionModel):
         self._compute_v = compute_v
         self._compute_var_ratio = compute_var_ratio
         self._rechunk = rechunk
-        self._u: xr.DataArray | None = None
-        self._s: np.ndarray | None = None
-        self._v: xr.DataArray | None = None
+        # Note: _u, _s, _v are initialized in super().__init__ but typed here for clarity if needed
         self._explained_var_ratio: np.ndarray | da.Array | None = None
 
     @property
@@ -365,77 +363,5 @@ class TruncatedSVD(DecompositionModel):
             )
             logger.exception(msg)
             raise ValueError(msg) from e
+        
         return self._singular_vectors_to_dataarray(X_da_transformed, X)
-
-    def reconstruct(
-        self,
-        snapshot: int | str,
-        snapshot_dim: str = "time",
-    ) -> xr.DataArray:
-        """Reconstruct a snapshot or group of snapshots from
-        the left singular vectors, singular values, and right
-        singular vectors.
-
-        Parameters
-        ----------
-        snapshot: int | str
-            The index or label of the snapshot to reconstruct.
-            If it's an integer, it's interpreted as an index. If it's
-            a string, it's interpreted as a label.
-        snapshot_dim: str, (default 'time')
-            The dimension along which the snapshots are indexed.
-
-        Returns
-        -------
-        xr.DataArray: The reconstructed snapshot/s as an Xarray DataArray.
-
-        Examples
-        --------
-        # Reconstructs the first snapshot
-        >>> tsvd.reconstruct_snapshot(0)
-
-        # Reconstructs all snapshots with label '2017-01-01'
-        >>> tsvd.reconstruct_snapshot("2017-01-01")
-        """
-
-        if not (
-            isinstance(self._u, xr.DataArray)
-            and isinstance(self._v, xr.DataArray)
-            and isinstance(self._s, np.ndarray)
-        ):
-            msg = (
-                "Computed left and right singular vectors and "
-                "singular values are required before calling reconstruct()."
-            )
-            logger.exception(msg)
-            raise ValueError(msg)
-
-        if isinstance(snapshot, int):
-            try:
-                if snapshot_dim in self._v.dims:
-                    return self._u @ (self._s * self._v[:, snapshot].T)
-                if snapshot_dim in self._u.dims:
-                    return (self._u[snapshot_dim, :] * self._s) @ self._v
-                msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
-                logger.exception(msg)
-                raise ValueError(msg)
-            except IndexError as e:
-                msg = (
-                    f"Snapshot index {snapshot} is out of bounds for the right "
-                    f"singular vectors with shape {self._v.shape}."
-                )
-                logger.exception(msg)
-                raise IndexError(msg) from e
-        else:
-            try:
-                if snapshot_dim in self._v.dims:
-                    return self._u @ (self._s * self._v.loc[:, snapshot].T)
-                if snapshot_dim in self._u.dims:
-                    return (self._u.loc[snapshot_dim, :] * self._s) @ self._v
-                msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
-                logger.exception(msg)
-                raise ValueError(msg)
-            except KeyError as e:
-                msg = f"Snapshot '{snapshot}' not found in the right singular vectors."
-                logger.exception(msg)
-                raise KeyError(msg) from e
