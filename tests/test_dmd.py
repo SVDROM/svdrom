@@ -5,7 +5,6 @@ import pytest
 import xarray as xr
 from make_test_data import DataGenerator, SignalGenerator
 
-import svdrom.config as config
 from svdrom.dmd import OptDMD
 from svdrom.preprocessing import hankel_preprocessing
 from svdrom.svd import TruncatedSVD
@@ -122,10 +121,9 @@ class BaseTestOptDMD:
             f"but got {solver.modes.shape} instead."
         )
         if self.hankel_preprocessing:
-            d = len(np.unique(self.u[config.get("hankel_coord_name")]))
-            expected_shape = (self.u.shape[0] // d, self.u.shape[1])
+            expected_shape = (self.u.shape[0] // self.d, self.u.shape[1])
             assert solver.modes_averaged.shape == expected_shape, (
-                f"For an input dataset with time-delay embedding of {d}, "
+                f"For an input dataset with time-delay embedding of {self.d}, "
                 f"expected 'modes_averaged.shape' to be {expected_shape}, "
                 f"but got {solver.modes.shape} instead."
             )
@@ -162,10 +160,9 @@ class BaseTestOptDMD:
                 "respectively."
             )
             if self.hankel_preprocessing:
-                d = len(np.unique(self.u[config.get("hankel_coord_name")]))
-                expected_shape = (self.u.shape[0] // d, self.u.shape[1])
+                expected_shape = (self.u.shape[0] // self.d, self.u.shape[1])
                 assert solver.modes_std_averaged.shape == expected_shape, (
-                    f"For an input dataset with time-delay embedding of {d}, "
+                    f"For an input dataset with time-delay embedding of {self.d}, "
                     f"expected 'modes_std_averaged.shape' to be {expected_shape}, "
                     f"but got {solver.modes.shape} instead."
                 )
@@ -357,7 +354,13 @@ class BaseTestOptDMD:
         """Test for the forecast() method."""
         solver = getattr(self, solver)
         forecast_span, dt = "10 s", "1 s"
-        expected_forecast_shape = (self.u.shape[0], 10)  # 10: 10s span, 1s interval
+        if self.hankel_preprocessing:
+            expected_forecast_shape = (
+                self.u.shape[0] // self.d,
+                10,
+            )  # 10: 10s span, 1s interval
+        else:
+            expected_forecast_shape = (self.u.shape[0], 10)  # 10: 10s span, 1s interval
         expected_forecast_dims = (self.u.dims[0], solver.time_dimension)
         _, expected_forecast_t_vector = solver._generate_forecast_time_vector(
             forecast_span=forecast_span,
@@ -448,15 +451,35 @@ class BaseTestOptDMD:
                 f"{expected_reconstruct_dims}, but got {reconstruction.dims} instead."
             )
             if isinstance(t, slice):
-                assert reconstruction.shape == (solver._modes.shape[0], 5), (
+                if self.hankel_preprocessing:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0] // self.d,
+                        5,
+                    )  # 5: len of slice
+                else:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0],
+                        5,
+                    )  # 5: len of slice
+                assert reconstruction.shape == expected_reconstruction_shape, (
                     "Expected 'reconstruction' to have shape "
-                    f"{(solver._modes.shape[0], 5)}, "
+                    f"{expected_reconstruction_shape}, "
                     f"but got {reconstruction.shape} instead."
                 )
             else:
-                assert reconstruction.shape == (solver._modes.shape[0], 1), (
+                if self.hankel_preprocessing:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0] // self.d,
+                        1,
+                    )  # 1: single snapshot
+                else:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0],
+                        1,
+                    )  # 1: single snapshot
+                assert reconstruction.shape == expected_reconstruction_shape, (
                     "Expected 'reconstruction' to have shape "
-                    f"{(solver._modes.shape[0], 1)}, "
+                    f"{expected_reconstruction_shape}, "
                     f"but got {reconstruction.shape} instead."
                 )
             np.testing.assert_array_equal(
@@ -494,15 +517,35 @@ class BaseTestOptDMD:
                     ),
                 )
                 if isinstance(t, slice):
-                    assert array.shape == (solver._modes.shape[0], 5), (
+                    if self.hankel_preprocessing:
+                        expected_reconstruction_shape = (
+                            solver._modes.shape[0] // self.d,
+                            5,
+                        )  # 5: len of slice
+                    else:
+                        expected_reconstruction_shape = (
+                            solver._modes.shape[0],
+                            5,
+                        )  # 5: len of slice
+                    assert array.shape == expected_reconstruction_shape, (
                         "Expected 'reconstruction' to have shape "
-                        f"{(solver._modes.shape[0], 5)}, "
+                        f"{expected_reconstruction_shape}, "
                         f"but got {array.shape} instead."
                     )
                 else:
-                    assert array.shape == (solver._modes.shape[0], 1), (
+                    if self.hankel_preprocessing:
+                        expected_reconstruction_shape = (
+                            solver._modes.shape[0] // self.d,
+                            1,
+                        )  # 1: single snapshot
+                    else:
+                        expected_reconstruction_shape = (
+                            solver._modes.shape[0],
+                            1,
+                        )  # 1: single snapshot
+                    assert array.shape == expected_reconstruction_shape, (
                         "Expected 'reconstruction' to have shape "
-                        f"{(solver._modes.shape[0], 1)}, "
+                        f"{expected_reconstruction_shape}, "
                         f"but got {array.shape} instead."
                     )
 
@@ -580,13 +623,13 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
         generator.generate_signal(random_seed=1234)
         cls.components = generator.components
         X = generator.da.transpose("x", "time")
-        d = 2
-        X_d = hankel_preprocessing(X, d=d)
+        cls.d = 2
+        X_d = hankel_preprocessing(X, d=cls.d)
         cls.hankel_preprocessing = True
         # convert to Dask-backed Xarray as TruncatedSVD currently only
         # supports Dask arrays
         X_d = X_d.copy(data=da.from_array(X_d.data))
-        n_components = len(cls.components) * d
+        n_components = len(cls.components) * cls.d
         tsvd = TruncatedSVD(n_components=n_components)
         tsvd.fit(X_d)
         cls.u, cls.s, cls.v = tsvd.u, tsvd.s, tsvd.v
