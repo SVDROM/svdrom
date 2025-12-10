@@ -636,3 +636,33 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
         cls.t = X_d.time
         cls.optdmd = OptDMD()
         cls.optdmd_bagging = OptDMD(num_trials=5, seed=1234)
+
+    @pytest.mark.parametrize("array_type", ["numpy", "dask"])
+    @pytest.mark.parametrize("hankel_d", [2, 3])
+    def test_extract_hankel_prediction(self, array_type, hankel_d):
+        """Test for the extract_hankel_prediction method."""
+        arr = np.random.randn(100, 10)
+        if array_type == "dask":
+            arr = da.from_array(arr)
+        # need to transform array into DataArray because
+        # hankel_preprocessing() only takes DataArrays
+        X = xr.DataArray(
+            data=arr,
+            dims=("x", "t"),
+            coords={
+                "x": ("x", np.arange(arr.shape[0])),
+                "t": ("t", np.arange(arr.shape[1])),
+            },
+        )
+        X_d = hankel_preprocessing(X, hankel_d)
+        X_extracted = self.optdmd._extract_hankel_prediction(X_d.data, hankel_d)
+        if isinstance(X_extracted, da.Array):
+            assert np.array_equal(X_extracted.compute(), X.values), (
+                "Expected the output of extract_hankel_preprocessing() "
+                "to match the input of hankel_preprocessing()."
+            )
+        else:
+            assert np.array_equal(X_extracted, X.values), (
+                "Expected the output of extract_hankel_preprocessing() "
+                "to match the input of hankel_preprocessing()."
+            )

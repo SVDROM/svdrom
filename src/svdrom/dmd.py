@@ -743,6 +743,49 @@ class OptDMD:
             ]
         )
 
+    @staticmethod
+    def _extract_hankel_prediction(
+        prediction: np.ndarray | da.Array,
+        hankel_d: int,
+        rechunk: bool = True,
+    ) -> np.ndarray | da.Array:
+        """Given a DMD prediction of a Hankel pre-processed (i.e.
+        time-delay embedded) matrix, extract the first occurrence of
+        each snapshot available in the given matrix.
+
+        Parameters
+        ----------
+        prediction: np.ndarray | da.Array
+            The DMD prediction (a forecast or a reconstruction).
+        hankel_d: int
+            Hankel rank of the input matrix. It should be an integer
+            greater than or equal to 2.
+        rechunk: bool
+            Whether to rechunk the input array into column blocks
+            of n rows, where n is the length of a single snapshot.
+            Default is True.
+
+        Returns
+        -------
+        np.ndarray | da.Array
+            A matrix containing the first occurrence of each snapshot.
+            If the input matrix has dimensions (n * hankel_d, t), the
+            output matrix will have dimensions (n, t + hankel_d - 1).
+            The output matrix is built by extracting the first column
+            and last row of the input matrix.
+        """
+        n = prediction.shape[0] // hankel_d
+        t = prediction.shape[1]
+        if rechunk and isinstance(prediction, da.Array):
+            prediction = prediction.rechunk({0: n, 1: 1})
+        snapshots = prediction[:, 0].reshape(hankel_d, -1).T
+        if t > 1:
+            if isinstance(prediction, da.Array):
+                snapshots = da.concatenate([snapshots, prediction[-n:, 1:]], axis=1)
+            else:
+                snapshots = np.concatenate([snapshots, prediction[-n:, 1:]], axis=1)
+        return snapshots
+
     def _estimate_array_size(self, t: np.ndarray) -> int:
         """Given an input time vector, estimate the size of the array
         resulting from the corresponding DMD reconstruction or forecast."""
