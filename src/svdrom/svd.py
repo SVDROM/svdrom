@@ -3,6 +3,7 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 
+import svdrom.config as config
 from svdrom.logger import setup_logger
 
 logger = setup_logger("SVD", "svd.log")
@@ -199,8 +200,12 @@ class TruncatedSVD:
             coords["components"] = np.arange(singular_vectors.shape[0])
             name = "svd_v"
             attrs = (
-                {"original_time": X.attrs["original_time"]}
-                if "original_time" in X.attrs
+                {
+                    config.get("hankel_original_time_attr"): X.attrs[
+                        config.get("hankel_original_time_attr")
+                    ]
+                }
+                if config.get("hankel_original_time_attr") in X.attrs
                 else None
             )
         else:

@@ -157,11 +157,11 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
 
     expected_orig_time_attr = X.time.values
     assert np.array_equal(
-        X_delayed.attrs["original_time"],
+        X_delayed.attrs[config.get("hankel_original_time_attr")],
         expected_orig_time_attr,
     ), (
         "Expected the original time vector to be saved as an attribute "
-        "with the name original_time."
+        f"with the name {config.get("hankel_original_time_attr")}."
     )
 
     assert np.array_equal(

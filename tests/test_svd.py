@@ -258,9 +258,9 @@ def test_svd_hankel():
         "data matrix."
     )
     assert np.array_equal(
-        tsvd.v.attrs["original_time"],
-        X_d.attrs["original_time"],
+        tsvd.v.attrs[config.get("hankel_original_time_attr")],
+        X_d.attrs[config.get("hankel_original_time_attr")],
     ), (
-        "The 'original_time' attribute in the right singular vectors and"
-        "Hankel-preprocessed data matrix should match."
+        f"The {config.get("hankel_original_time_attr")} attribute in the right "
+        "singular vectors and Hankel-preprocessed data matrix should match."
     )

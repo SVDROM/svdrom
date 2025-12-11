@@ -1,5 +1,6 @@
 _fixed_config = {
     "hankel_coord_name": "hankel_lag",
+    "hankel_original_time_attr": "original_time",
 }
 
 _editable_config = {

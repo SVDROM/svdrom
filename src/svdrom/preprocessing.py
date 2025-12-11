@@ -221,6 +221,6 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
             ),
         },
         attrs={
-            "original_time": X[dims[1]].values,
+            config.get("hankel_original_time_attr"): X[dims[1]].values,
         },
     )
