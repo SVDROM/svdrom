@@ -317,12 +317,12 @@ class OptDMD:
                 )
                 logger.exception(msg)
                 raise ValueError(msg)
-            if config.get("hankel_original_time_attr") not in v.attrs:
+            if config.get("hankel_time_mapping_attr") not in v.attrs:
                 msg = (
                     "Given the left singular vectors (u) contain a "
                     f"{config.get("hankel_coord_name")} coordinate, expected "
                     "right singular vectors (v) to contain a "
-                    f"{config.get("hankel_original_time_attr")} attribute."
+                    f"{config.get("hankel_time_mapping_attr")} attribute."
                 )
 
     def _get_time_conversion_factor(self, from_units: str, to_units: str) -> float:

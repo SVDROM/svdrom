@@ -201,11 +201,11 @@ class TruncatedSVD:
             name = "svd_v"
             attrs = (
                 {
-                    config.get("hankel_original_time_attr"): X.attrs[
-                        config.get("hankel_original_time_attr")
+                    config.get("hankel_time_mapping_attr"): X.attrs[
+                        config.get("hankel_time_mapping_attr")
                     ]
                 }
-                if config.get("hankel_original_time_attr") in X.attrs
+                if config.get("hankel_time_mapping_attr") in X.attrs
                 else None
             )
         else:

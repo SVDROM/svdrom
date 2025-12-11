@@ -155,13 +155,40 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         "where t is the time coordinate of the original matrix."
     )
 
-    expected_orig_time_attr = X.time.values
+    original_time_vector = X.time.values
+    hankel_time_mapping = X_delayed.attrs[config.get("hankel_time_mapping_attr")]
     assert np.array_equal(
-        X_delayed.attrs[config.get("hankel_original_time_attr")],
-        expected_orig_time_attr,
+        np.array(list(hankel_time_mapping.keys())),
+        original_time_vector,
     ), (
-        "Expected the original time vector to be saved as an attribute "
-        f"with the name {config.get("hankel_original_time_attr")}."
+        "Expected the original time vector to be saved in a dictionary as an "
+        f"attribute with the name {config.get("hankel_time_mapping_attr")}."
+    )
+
+    assert np.array_equal(
+        hankel_time_mapping[original_time_vector[0]],
+        np.array([original_time_vector[0]]),
+    ), (
+        f"Expected hankel_time_mapping[{original_time_vector[0]}] to "
+        f"be {np.array([original_time_vector[0]])}, but got "
+        f"{hankel_time_mapping[original_time_vector[0]]}."
+    )
+    i = int(n_snapshots / 2)
+    assert np.array_equal(
+        hankel_time_mapping[original_time_vector[i]],
+        original_time_vector[i - d + 1 : i + 1],
+    ), (
+        f"Expected hankel_time_mapping[{original_time_vector[i]}] to "
+        f"be {original_time_vector[i - d + 1 : i + 1]}, but got "
+        f"{hankel_time_mapping[original_time_vector[i]]}."
+    )
+    assert np.array_equal(
+        hankel_time_mapping[original_time_vector[-1]],
+        np.array([(original_time_vector[-d])]),
+    ), (
+        f"Expected hankel_time_mapping[{original_time_vector[-1]}] to "
+        f"be {np.array([(original_time_vector[-d])])}, but got "
+        f"{hankel_time_mapping[original_time_vector[-1]]}."
     )
 
     assert np.array_equal(

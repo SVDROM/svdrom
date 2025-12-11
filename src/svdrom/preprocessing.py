@@ -171,10 +171,10 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         resulting in a matrix with dimensions ((2*m) x (n-1)). If the input
         DataArray is NumPy-backed, the returned DataArray is also NumPy-backed.
         If it is Dask-backed, then the returned DataArray is also Dask-backed.
-        The returned DataArray has a new coordinate, but default names 'lag',
-        which indicates the time delay relative to the current time stamp. You
-        can change the default name of this coordinate using
-        svdrom.config.set(hankel_coord_name="desired name").
+        The returned DataArray has a new coordinate which indicates the time
+        delay relative to the current time stamp. It also contains a new attribute
+        that maps each original snapshot to the time-delay embedded snapshots in
+        which it appears.
     """
     if X.ndim != 2:
         msg = "The input array must be two dimensional."
@@ -209,6 +209,19 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
             samples,
             names=X.indexes[dims[0]].names,
         )
+
+    # map each original snapshot to the time-delay embedded
+    # snapshots in which it appears
+    original_time = X[dims[1]].values
+    hankel_time_mapping = dict.fromkeys(original_time)
+    for i, time in enumerate(hankel_time_mapping):
+        if i - d < 0:
+            hankel_time_mapping[time] = original_time[: i + 1]
+        elif i - d >= 0 and i + d <= len(original_time):
+            hankel_time_mapping[time] = original_time[i - d + 1 : i + 1]
+        else:
+            hankel_time_mapping[time] = original_time[i - d + 1 : -d + 1]
+
     return xr.DataArray(
         X_delayed,
         dims=dims,
@@ -221,6 +234,6 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
             ),
         },
         attrs={
-            config.get("hankel_original_time_attr"): X[dims[1]].values,
+            config.get("hankel_time_mapping_attr"): hankel_time_mapping,
         },
     )

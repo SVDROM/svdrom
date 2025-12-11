@@ -257,10 +257,10 @@ def test_svd_hankel():
         f"to match the {hankel_coord_name} coordinate of the Hankel-preprocessed "
         "data matrix."
     )
-    assert np.array_equal(
-        tsvd.v.attrs[config.get("hankel_original_time_attr")],
-        X_d.attrs[config.get("hankel_original_time_attr")],
+    assert (
+        tsvd.v.attrs[config.get("hankel_time_mapping_attr")]
+        == X_d.attrs[config.get("hankel_time_mapping_attr")]
     ), (
-        f"The {config.get("hankel_original_time_attr")} attribute in the right "
+        f"The {config.get("hankel_time_mapping_attr")} attribute in the right "
         "singular vectors and Hankel-preprocessed data matrix should match."
     )
