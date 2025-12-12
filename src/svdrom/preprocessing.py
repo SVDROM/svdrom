@@ -213,8 +213,8 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
     # map each original snapshot to the time-delay embedded
     # snapshots in which it appears
     original_time = X[dims[1]].values
-    hankel_time_mapping = dict.fromkeys(original_time)
-    for i, time in enumerate(hankel_time_mapping):
+    hankel_time_mapping = {}
+    for i, time in enumerate(original_time):
         if i - d < 0:
             hankel_time_mapping[time] = original_time[: i + 1]
         elif i - d >= 0 and i + d <= len(original_time):
