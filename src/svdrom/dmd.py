@@ -120,6 +120,7 @@ class OptDMD:
         self._is_datetime: bool = False  # internal use only
         self._dynamics: xr.DataArray | None = None
         self._hankel_d: int = 1
+        self._hankel_time_mapping: dict | None = None
 
     @property
     def n_modes(self) -> int:
@@ -558,6 +559,7 @@ class OptDMD:
         u, s, v = u[:, : self._n_modes], s[: self._n_modes], v[: self._n_modes, :]
         if config.get("hankel_coord_name") in u.coords:
             self._hankel_d = len(np.unique(u[config.get("hankel_coord_name")].values))
+            self._hankel_time_mapping = v.attrs[config.get("hankel_time_mapping_attr")]
 
         bopdmd = BOPDMD(
             svd_rank=self._n_modes,
@@ -943,6 +945,45 @@ class OptDMD:
             msg = "Slice must contain time coordinate indices or labels."
             logger.exception(msg)
             raise ValueError(msg)
+
+        def _extract_hankel_time(t: str | int) -> str | int:
+            """Given a single snapshot (either a string label or a
+            integer index) in the original time vector, extract the
+            corresponding snapshot in the Hankel time vector.
+
+            Parameters
+            ----------
+            t: str | int
+                A single snapshot in the original time vector, either
+                as a string label or an integer index.
+            Returns
+            -------
+            str | int
+                The corresponding snapshot in the Hankel time vector,
+                either as a string label or an integer index. Negative
+                indexing is supported.
+                The first snapshot available in the Hankel time vector that
+                corresponds to the given snapshot in the original time
+                vector is returned.
+            """
+            if isinstance(t, str):
+                if self._hankel_time_mapping is None:
+                    msg = "The hankel time mapping dictionary is not available."
+                    raise RuntimeError(msg)
+                try:
+                    first_snapshot = self._hankel_time_mapping[np.datetime64(t)][0]
+                except Exception as e:
+                    msg = (
+                        f"Can't find snapshot {str} in the data's original time vector."
+                    )
+                    logger.exception(msg)
+                    raise ValueError(msg) from e
+                return first_snapshot.astype(str)
+            if t < 0:
+                return t
+            if t - self._hankel_d < 0:
+                return 0
+            return t - self._hankel_d + 1
 
         try:
             if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
