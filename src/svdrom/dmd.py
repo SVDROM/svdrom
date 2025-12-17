@@ -795,6 +795,61 @@ class OptDMD:
                 snapshots = np.concatenate([snapshots, prediction[-n:, 1:]], axis=1)
         return snapshots
 
+    @staticmethod
+    def _extract_hankel_time(
+        t: str | int,
+        hankel_d: int,
+        hankel_time_mapping: dict,
+    ) -> tuple[str, int] | tuple[int, int]:
+        """Given a single snapshot (either a string label or a
+        integer index) in the original time vector, extract the
+        corresponding snapshot in the Hankel time vector.
+
+        Parameters
+        ----------
+        t: str | int
+            A single snapshot in the original time vector, either
+            as a string label or an integer index.
+        hankel_d: int
+            Hankel rank. It should be an integer greater than
+            or equal to 2.
+        hankel_time_mapping: dict
+            A dictionary mapping the original snapshots to the
+            Hankel snapshots in which they appear.
+
+        Returns
+        -------
+        str | int
+            The corresponding snapshot in the Hankel time vector,
+            either as a string label or an integer index. Negative
+            indexing is supported.
+            The first snapshot available in the Hankel time vector that
+            corresponds to the given snapshot in the original time
+            vector is returned.
+        int
+            The lag index in the Hankel pre-processed matrix corresponding
+            to the requested snapshot.
+        """
+        if isinstance(t, str):
+            try:
+                snapshot_list = hankel_time_mapping[np.datetime64(t)]
+                first_snapshot = snapshot_list[0]
+            except Exception as e:
+                msg = f"Can't find snapshot {t} in the data's original time vector."
+                logger.exception(msg)
+                raise ValueError(msg) from e
+            lag = len(snapshot_list) - 1
+            return first_snapshot.astype(str), lag
+        if t < 0:
+            if abs(t) > len(hankel_time_mapping) - hankel_d + 1:
+                msg = "Negative index is out of bounds. Trying using a positive index."
+                logger.exception(msg)
+                raise ValueError(msg)
+            return t, hankel_d - 1
+        if t - hankel_d < 0:
+            return 0, t
+        return t - hankel_d + 1, hankel_d - 1
+
     def _estimate_array_size(self, t: np.ndarray) -> int:
         """Given an input time vector, estimate the size of the array
         resulting from the corresponding DMD reconstruction or forecast."""
@@ -946,44 +1001,29 @@ class OptDMD:
             logger.exception(msg)
             raise ValueError(msg)
 
-        def _extract_hankel_time(t: str | int) -> str | int:
-            """Given a single snapshot (either a string label or a
-            integer index) in the original time vector, extract the
-            corresponding snapshot in the Hankel time vector.
-
-            Parameters
-            ----------
-            t: str | int
-                A single snapshot in the original time vector, either
-                as a string label or an integer index.
-            Returns
-            -------
-            str | int
-                The corresponding snapshot in the Hankel time vector,
-                either as a string label or an integer index. Negative
-                indexing is supported.
-                The first snapshot available in the Hankel time vector that
-                corresponds to the given snapshot in the original time
-                vector is returned.
-            """
-            if isinstance(t, str):
-                if self._hankel_time_mapping is None:
-                    msg = "The hankel time mapping dictionary is not available."
-                    raise RuntimeError(msg)
-                try:
-                    first_snapshot = self._hankel_time_mapping[np.datetime64(t)][0]
-                except Exception as e:
-                    msg = (
-                        f"Can't find snapshot {str} in the data's original time vector."
+        lag = None
+        if self._hankel_d > 1:
+            if self._hankel_time_mapping is None:
+                msg = "The Hankel time mapping dictionary is not available."
+                raise RuntimeError(msg)
+            if isinstance(t, slice):
+                t_start, lag_start = (
+                    self._extract_hankel_time(
+                        t.start, self._hankel_d, self._hankel_time_mapping
                     )
-                    logger.exception(msg)
-                    raise ValueError(msg) from e
-                return first_snapshot.astype(str)
-            if t < 0:
-                return t
-            if t - self._hankel_d < 0:
-                return 0
-            return t - self._hankel_d + 1
+                    if t.start
+                    else (None, 0)
+                )
+                t_stop, lag_stop = self._extract_hankel_time(
+                    t.stop, self._hankel_d, self._hankel_time_mapping
+                )
+                t = slice(t_start, t_stop)
+                lag = (lag_start, lag_stop)
+            elif t is not None:
+                t, lag_single = self._extract_hankel_time(
+                    t, self._hankel_d, self._hankel_time_mapping
+                )
+                lag = (lag_single, lag_single)  # noqa: F841
 
         try:
             if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
