@@ -482,14 +482,13 @@ class BaseTestOptDMD:
                     f"{expected_reconstruction_shape}, "
                     f"but got {reconstruction.shape} instead."
                 )
-            np.testing.assert_array_equal(
+            assert np.array_equal(
                 reconstruction[solver.time_dimension].values,
                 solver.time_fit[t],
-                err_msg=(
-                    "Expected the reconstruction time vector to be: "
-                    f"{solver.time_fit[t]}, "
-                    f"but got {reconstruction[solver.time_dimension].values} instead."
-                ),
+            ), (
+                "Expected the reconstruction time vector to be: "
+                f"{solver.time_fit[t]}, "
+                f"but got {reconstruction[solver.time_dimension].values} instead."
             )
         else:
             # with bagging
@@ -507,14 +506,12 @@ class BaseTestOptDMD:
                     "Expected 'reconstruction' to have dimensions "
                     f"{expected_reconstruct_dims}, but got {array.dims} instead."
                 )
-                np.testing.assert_array_equal(
-                    array[solver.time_dimension].values,
-                    solver.time_fit[t],
-                    err_msg=(
-                        "Expected the reconstruction time vector to be: "
-                        f"{solver.time_fit[t]}, "
-                        f"but got {array[solver.time_dimension].values} instead."
-                    ),
+                assert np.array_equal(
+                    array[solver.time_dimension].values, solver.time_fit[t]
+                ), (
+                    "Expected the reconstruction time vector to be: "
+                    f"{solver.time_fit[t]}, "
+                    f"but got {array[solver.time_dimension].values} instead."
                 )
                 if isinstance(t, slice):
                     if self.hankel_preprocessing:
