@@ -636,3 +636,24 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
                 "Expected the output of extract_hankel_preprocessing() "
                 "to match the input of hankel_preprocessing()."
             )
+
+    @pytest.mark.parametrize("t", [0, 1, 5, 10, -2, -1])
+    def test_extract_hankel_time(self, t):
+        """Test for the extract_hankel_time method."""
+        t_hankel, lag = self.optdmd._extract_hankel_time(t)
+        if t < 0:
+            expected_t_hankel = t
+            expected_lag = self.d - 1
+        elif t - self.d < 0:
+            expected_t_hankel = 0
+            expected_lag = t
+        else:
+            expected_t_hankel = t - self.d + 1
+            expected_lag = self.d - 1
+        assert t_hankel == expected_t_hankel, (
+            f"Expected t_hankel to be {expected_t_hankel}, "
+            f"but got {t_hankel} instead."
+        )
+        assert (
+            lag == expected_lag
+        ), f"Expected lag to be {expected_lag}, but got {lag} instead."
