@@ -440,16 +440,8 @@ class BaseTestOptDMD:
         solver = getattr(self, solver)
         reconstruction = solver.reconstruct(t)
         expected_reconstruct_dims = (self.u.dims[0], solver.time_dimension)
-        if solver.num_trials == 0:
-            # no bagging
-            assert isinstance(reconstruction, xr.DataArray), (
-                "Expected 'reconstruction' to be of type 'xr.DataArray', "
-                f"but got {type(reconstruction)} instead."
-            )
-            assert reconstruction.dims == expected_reconstruct_dims, (
-                "Expected 'reconstruction' to have dimensions "
-                f"{expected_reconstruct_dims}, but got {reconstruction.dims} instead."
-            )
+
+        def check_reconstruction_shape(reconstruction: xr.DataArray):
             if isinstance(t, slice):
                 if self.hankel_preprocessing:
                     expected_reconstruction_shape = (
@@ -482,6 +474,18 @@ class BaseTestOptDMD:
                     f"{expected_reconstruction_shape}, "
                     f"but got {reconstruction.shape} instead."
                 )
+
+        if solver.num_trials == 0:
+            # no bagging
+            assert isinstance(reconstruction, xr.DataArray), (
+                "Expected 'reconstruction' to be of type 'xr.DataArray', "
+                f"but got {type(reconstruction)} instead."
+            )
+            assert reconstruction.dims == expected_reconstruct_dims, (
+                "Expected 'reconstruction' to have dimensions "
+                f"{expected_reconstruct_dims}, but got {reconstruction.dims} instead."
+            )
+            check_reconstruction_shape(reconstruction)
             assert np.array_equal(
                 reconstruction[solver.time_dimension].values,
                 solver.time_fit[t],
@@ -506,6 +510,7 @@ class BaseTestOptDMD:
                     "Expected 'reconstruction' to have dimensions "
                     f"{expected_reconstruct_dims}, but got {array.dims} instead."
                 )
+                check_reconstruction_shape(array)
                 assert np.array_equal(
                     array[solver.time_dimension].values, solver.time_fit[t]
                 ), (
@@ -513,38 +518,6 @@ class BaseTestOptDMD:
                     f"{solver.time_fit[t]}, "
                     f"but got {array[solver.time_dimension].values} instead."
                 )
-                if isinstance(t, slice):
-                    if self.hankel_preprocessing:
-                        expected_reconstruction_shape = (
-                            solver._modes.shape[0] // self.d,
-                            5,
-                        )  # 5: len of slice
-                    else:
-                        expected_reconstruction_shape = (
-                            solver._modes.shape[0],
-                            5,
-                        )  # 5: len of slice
-                    assert array.shape == expected_reconstruction_shape, (
-                        "Expected 'reconstruction' to have shape "
-                        f"{expected_reconstruction_shape}, "
-                        f"but got {array.shape} instead."
-                    )
-                else:
-                    if self.hankel_preprocessing:
-                        expected_reconstruction_shape = (
-                            solver._modes.shape[0] // self.d,
-                            1,
-                        )  # 1: single snapshot
-                    else:
-                        expected_reconstruction_shape = (
-                            solver._modes.shape[0],
-                            1,
-                        )  # 1: single snapshot
-                    assert array.shape == expected_reconstruction_shape, (
-                        "Expected 'reconstruction' to have shape "
-                        f"{expected_reconstruction_shape}, "
-                        f"but got {array.shape} instead."
-                    )
 
 
 class TestOptDMDRandomData(BaseTestOptDMD):
