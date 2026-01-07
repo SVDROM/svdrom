@@ -116,7 +116,9 @@ class OptDMD:
         self._modes_std: xr.DataArray | None = None
         self._solver: BOPDMD | None = None
         self._time_fit: np.ndarray | None = None
+        self._time_fit_original: np.ndarray | None = None
         self._t_fit: np.ndarray | None = None  # internal use only
+        self._t_fit_original: np.ndarray | None = None  # internal use only
         self._is_datetime: bool = False  # internal use only
         self._dynamics: xr.DataArray | None = None
         self._hankel_d: int = 1
@@ -341,6 +343,9 @@ class OptDMD:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Given the right singular vectors containing the temporal
         information, generate the time vector(s) for the DMD fit.
+        When Hankel pre-processing has been applied, it also calculates
+        the fit time vectors of the original data, although these are
+        not used for the DMD fit.
 
         Parameters
         ----------
@@ -356,30 +361,48 @@ class OptDMD:
             which may consist of floats or timedeltas, depending
             on the input data.
         """
+
+        def calculate_time_deltas_float(time_deltas: np.ndarray) -> np.ndarray:
+            if np.issubdtype(time_deltas.dtype, np.timedelta64):
+                # if the input time vector contains datetimes
+                self._is_datetime = True
+                time_deltas_td = time_deltas.astype(f"timedelta64[{self._time_units}]")
+                time_deltas_float = time_deltas_td / np.timedelta64(1, self._time_units)
+            else:
+                # if the input time vector contains floats
+                self._is_datetime = False
+                time_deltas_float = time_deltas.astype(np.float64)
+                conversion_factor = self._get_time_conversion_factor(
+                    self._input_time_units,
+                    self._time_units,
+                )
+                time_deltas_float *= conversion_factor
+            return time_deltas_float
+
         time_fit = v[self._time_dimension].values
         time_deltas = np.diff(time_fit)
-
-        if np.issubdtype(time_deltas.dtype, np.timedelta64):
-            # if the input time vector contains datetimes
-            self._is_datetime = True
-            time_deltas_td = time_deltas.astype(f"timedelta64[{self._time_units}]")
-            time_deltas_float = time_deltas_td / np.timedelta64(1, self._time_units)
-        else:
-            # if the input time vector contains floats
-            self._is_datetime = False
-            time_deltas_float = time_deltas.astype(np.float64)
-            conversion_factor = self._get_time_conversion_factor(
-                self._input_time_units,
-                self._time_units,
-            )
-            time_deltas_float *= conversion_factor
-
+        time_deltas_float = calculate_time_deltas_float(time_deltas)
         time_vector = np.cumsum(time_deltas_float)
         self._time_fit = time_fit  # vector representing true time of the training data
         start_time = np.array([0], dtype=np.float64)
         self._t_fit = np.concatenate(
             (start_time, time_vector)
         )  # vector to be fed to the `fit()` call
+
+        if self._hankel_d > 1:
+            # If Hankel pre-processing has been applied, do the same
+            # for the data's original time vector
+            if not self._hankel_time_mapping:
+                msg = "The Hankel time mapping dictionary is not available."
+                raise RuntimeError(msg)
+            time_fit = np.sort(list(self._hankel_time_mapping.keys()))
+            time_deltas = np.diff(time_fit)
+            time_deltas_float = calculate_time_deltas_float(time_deltas)
+            time_vector = np.cumsum(time_deltas_float)
+            self._time_fit_original = time_fit
+            start_time = np.array([0], dtype=np.float64)
+            self._t_fit_original = np.concatenate((start_time, time_vector))
+
         return self._t_fit, self._time_fit
 
     def _generate_forecast_time_vector(
@@ -1006,7 +1029,9 @@ class OptDMD:
         # convert the time span in the original time vector to the
         # corresponding span in the Hankel time vector.
         lags: tuple[int, int] | tuple[int] | None = None
+        t_original: slice | int | str | None = None
         if self._hankel_d > 1:
+            t_original = t
             if isinstance(t, slice):
                 t_start, lag_start = (
                     self._extract_hankel_time(t.start) if t.start else (None, 0)
@@ -1026,12 +1051,25 @@ class OptDMD:
                     self._time_fit, dims="time", coords={"time": self._time_fit}
                 )
                 time_reconstruct = time_fit.sel(time=t).values
+                if self._time_fit_original is not None and t_original is not None:
+                    time_fit_original = xr.DataArray(
+                        self._time_fit_original,
+                        dims="time",
+                        coords={"time": self._time_fit_original},
+                    )
+                    time_reconstruct_original = time_fit_original.sel(
+                        time=t_original
+                    ).values
             elif (
                 isinstance(t, slice) and _check_slice_type(t) == "index"
             ) or isinstance(t, int):
                 time_reconstruct = self._time_fit[t]
+                if self._time_fit_original is not None and t_original is not None:
+                    time_reconstruct_original = self._time_fit_original[t_original]
             elif t is None:
                 time_reconstruct = self._time_fit
+                if self._time_fit_original is not None:
+                    time_reconstruct_original = self._time_fit_original
             else:
                 msg = "Parameter 't' must be a slice, an integer, a string or None."
                 logger.exception(msg)
@@ -1064,10 +1102,11 @@ class OptDMD:
             logger.exception(msg)
             raise RuntimeError(msg) from e
         logger.info("Done.")
-        try:
-            if self._hankel_d > 1:
-                # if Hankel preprocessing has been used, extract the
-                # relevant snapshots from the Hankel matrix
+
+        if self._hankel_d > 1:
+            # if Hankel preprocessing has been used, extract the
+            # relevant snapshots from the Hankel matrix
+            try:
                 if isinstance(reconstruction, tuple):
                     reconstruction = cast(
                         tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
@@ -1086,8 +1125,12 @@ class OptDMD:
                         self._hankel_d,
                         lags,
                     )
-                # TODO: build the time_reconstruct vector accordingly when
-                # Hankel pre-processing has been used
+                time_reconstruct = time_reconstruct_original
+            except Exception as e:
+                msg = "Error extracting the reconstuction from the Hankel matrix."
+                logger.exception(msg)
+                raise RuntimeError(msg) from e
+        try:
             return self._prediction_to_dataarray(reconstruction, time_reconstruct)
         except Exception as e:
             msg = "Error trying to convert reconstruction into xarray.DataArray."
