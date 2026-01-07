@@ -1,5 +1,5 @@
 import warnings
-from typing import Literal
+from typing import Literal, cast
 
 import dask
 import dask.array as da
@@ -756,6 +756,7 @@ class OptDMD:
     def _extract_hankel_prediction(
         prediction: np.ndarray | da.Array,
         hankel_d: int,
+        lags: tuple[int,] | tuple[int, int] | None = None,
         rechunk: bool = True,
     ) -> np.ndarray | da.Array:
         """Given a DMD prediction of a Hankel pre-processed (i.e.
@@ -788,6 +789,8 @@ class OptDMD:
         if rechunk and isinstance(prediction, da.Array):
             prediction = prediction.rechunk({0: n, 1: 1})
         snapshots = prediction[:, 0].reshape(hankel_d, -1).T
+        if lags:
+            snapshots = snapshots[:, lags]
         if t > 1:
             if isinstance(prediction, da.Array):
                 snapshots = da.concatenate([snapshots, prediction[-n:, 1:]], axis=1)
@@ -838,7 +841,7 @@ class OptDMD:
             return first_snapshot.astype(str), lag
         if t < 0:
             if abs(t) > len(self._hankel_time_mapping) - self._hankel_d + 1:
-                msg = "Negative index is out of bounds. Trying using a positive index."
+                msg = "Negative index is out of bounds. Try using a positive index."
                 logger.exception(msg)
                 raise ValueError(msg)
             return t, self._hankel_d - 1
@@ -950,8 +953,11 @@ class OptDMD:
         Parameters
         ----------
         t: slice | int | str | None, optional
-            The time span over which to perform the DMD reconstruction. If
-            't' is a slice, it may contain integers or strings, where integers
+            The time span over which to perform the DMD reconstruction. If you
+            have performed Hankel pre-processing, this time should nevertheless
+            be expressed in the time vector of the original data, not the Hankel
+            pre-processed data.
+            If 't' is a slice, it may contain integers or strings, where integers
             and strings are interpreted as starting and stopping indices or labels
             of the fit time vector, respectively. To reconstruct a single snapshot,
             't' should be an integer or string specifying the index or label of the
@@ -997,7 +1003,9 @@ class OptDMD:
             logger.exception(msg)
             raise ValueError(msg)
 
-        lag = None
+        # convert the time span in the original time vector to the
+        # corresponding span in the Hankel time vector.
+        lags: tuple[int, int] | tuple[int] | None = None
         if self._hankel_d > 1:
             if isinstance(t, slice):
                 t_start, lag_start = (
@@ -1005,10 +1013,10 @@ class OptDMD:
                 )
                 t_stop, lag_stop = self._extract_hankel_time(t.stop)
                 t = slice(t_start, t_stop)
-                lag = (lag_start, lag_stop)
+                lags = (lag_start, lag_stop)
             elif t is not None:
                 t, lag_single = self._extract_hankel_time(t)
-                lag = (lag_single, lag_single)  # noqa: F841
+                lags = (lag_single,)
 
         try:
             if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
@@ -1057,6 +1065,29 @@ class OptDMD:
             raise RuntimeError(msg) from e
         logger.info("Done.")
         try:
+            if self._hankel_d > 1:
+                # if Hankel preprocessing has been used, extract the
+                # relevant snapshots from the Hankel matrix
+                if isinstance(reconstruction, tuple):
+                    reconstruction = cast(
+                        tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
+                        tuple(
+                            self._extract_hankel_prediction(
+                                recon,
+                                self._hankel_d,
+                                lags,
+                            )
+                            for recon in reconstruction
+                        ),
+                    )
+                else:
+                    reconstruction = self._extract_hankel_prediction(
+                        reconstruction,
+                        self._hankel_d,
+                        lags,
+                    )
+                # TODO: build the time_reconstruct vector accordingly when
+                # Hankel pre-processing has been used
             return self._prediction_to_dataarray(reconstruction, time_reconstruct)
         except Exception as e:
             msg = "Error trying to convert reconstruction into xarray.DataArray."
