@@ -636,9 +636,10 @@ class OptDMD:
         )
             A DMD forecast or reconstruction, deterministic (single array) or
             probabilistic (two arrays - ensemble mean and variance). The arrays can be
-            NumPy or Dask arrays.
+            NumPy or Dask arrays. Dimensions should be (space/samples, time).
         time_prediction: np.ndarray[float] | np.ndarray[np.timedelta64]
-            The time vector representing the true prediction time.
+            The time vector representing the true prediction time. Must have the same
+            length as the second dimension of 'prediction'.
 
         Returns
         -------
@@ -655,6 +656,16 @@ class OptDMD:
 
         dims = (self._modes.dims[0], self._time_dimension)
         coords = {k: v for k, v in self._modes.coords.items() if k != "components"}
+        if self._hankel_d > 1:
+            # If Hankel pre-processing has been used, keep only the spatial
+            # locations/samples associated with the zero-lag, and remove the
+            # lag coordinate
+            coords[dims[0]] = (
+                coords[dims[0]]
+                .sel({dims[0]: coords[dims[0]][config.get("hankel_coord_name")] == 0})
+                .drop_vars(config.get("hankel_coord_name"))
+            )
+            del coords[config.get("hankel_coord_name")]
         coords[self._time_dimension] = time_prediction
         if isinstance(prediction, (np.ndarray | da.Array)):
             return xr.DataArray(
