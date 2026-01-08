@@ -1064,8 +1064,9 @@ class OptDMD:
             logger.exception(msg)
             raise ValueError(msg)
 
-        # convert the time span in the original time vector to the
-        # corresponding span in the Hankel time vector.
+        # convert the requested time span in the original time vector frame of
+        # reference to the corresponding span in the Hankel time vector, and
+        # obtain the associated lag indices of the Hankel pre-processed matrix
         lags: tuple[int, int] | tuple[int] | None = None
         t_original: slice | int | str | None = None
         if self._hankel_d > 1:
@@ -1081,6 +1082,8 @@ class OptDMD:
                 t, lag_single = self._extract_hankel_time(t)
                 lags = (lag_single,)
 
+        # now, compute the reconstruction time vector so that we can compute
+        # the prediction
         try:
             if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
                 t, str
@@ -1090,6 +1093,7 @@ class OptDMD:
                 )
                 time_reconstruct = time_fit.sel(time=t).values
                 if self._time_fit_original is not None and t_original is not None:
+                    # if Hankel pre-processing has been applied
                     time_fit_original = xr.DataArray(
                         self._time_fit_original,
                         dims="time",
@@ -1103,10 +1107,12 @@ class OptDMD:
             ) or isinstance(t, int):
                 time_reconstruct = self._time_fit[t]
                 if self._time_fit_original is not None and t_original is not None:
+                    # if Hankel pre-processing has been applied
                     time_reconstruct_original = self._time_fit_original[t_original]
             elif t is None:
                 time_reconstruct = self._time_fit
                 if self._time_fit_original is not None:
+                    # if Hankel pre-processing has been applied
                     time_reconstruct_original = self._time_fit_original
             else:
                 msg = "Parameter 't' must be a slice, an integer, a string or None."
@@ -1125,6 +1131,7 @@ class OptDMD:
         msg = f"Estimated reconstruction size is {estimated_size/1e3:.3f} KB."
         logger.info(msg)
 
+        # compute the reconstruction, using Dask or directly with NumPy
         if estimated_size > memory_limit_bytes:
             logger.info("Will use Dask to compute the reconstruction.")
             use_dask = True
@@ -1141,9 +1148,9 @@ class OptDMD:
             raise RuntimeError(msg) from e
         logger.info("Done.")
 
+        # if Hankel preprocessing has been used, extract the
+        # relevant snapshots from the computed reconstruction matrix
         if self._hankel_d > 1:
-            # if Hankel preprocessing has been used, extract the
-            # relevant snapshots from the Hankel matrix
             try:
                 if isinstance(reconstruction, tuple):
                     reconstruction = cast(
@@ -1168,6 +1175,8 @@ class OptDMD:
                 msg = "Error extracting the reconstuction from the Hankel matrix."
                 logger.exception(msg)
                 raise RuntimeError(msg) from e
+
+        # finally, transform the computed reconstruction into a labelled DataArray
         try:
             return self._prediction_to_dataarray(reconstruction, time_reconstruct)
         except Exception as e:
