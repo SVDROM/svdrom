@@ -859,6 +859,18 @@ class OptDMD:
         int
             The lag index in the Hankel pre-processed matrix corresponding
             to the requested snapshot.
+
+        Notes
+        -----
+        For example, if the original data consisted of t n-long snapshots,
+        the original data matrix would have shape (n, t). If we performed
+        Hankel pre-processing with Hankel rank d = 2, the resulting matrix
+        would have shape (2*n, t-1), where the first row block [:n, :]
+        corresponds to lag=0 and the second row block [n:, :] corresponds
+        to lag=1. If we call _extract_hankel_time() passing t = 5,
+        the function should return the tuple (4, 1), because the first
+        occurrence of the 5th original snapshot is in the second block (lag=1)
+        of the 4th snapshot of the Hankel pre-processed matrix.
         """
         if self._hankel_time_mapping is None:
             msg = "The Hankel time mapping dictionary is not available."
