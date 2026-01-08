@@ -1092,8 +1092,13 @@ class OptDMD:
                     self._time_fit, dims="time", coords={"time": self._time_fit}
                 )
                 time_reconstruct = time_fit.sel(time=t).values
-                if self._time_fit_original is not None and t_original is not None:
-                    # if Hankel pre-processing has been applied
+                if self._hankel_d > 1:
+                    if self._time_fit_original is None or t_original is None:
+                        msg = (
+                            "Required time vector information "
+                            "for Hankel post-processing is missing."
+                        )
+                        raise RuntimeError(msg)
                     time_fit_original = xr.DataArray(
                         self._time_fit_original,
                         dims="time",
@@ -1106,13 +1111,23 @@ class OptDMD:
                 isinstance(t, slice) and _check_slice_type(t) == "index"
             ) or isinstance(t, int):
                 time_reconstruct = self._time_fit[t]
-                if self._time_fit_original is not None and t_original is not None:
-                    # if Hankel pre-processing has been applied
+                if self._hankel_d > 1:
+                    if self._time_fit_original is None or t_original is None:
+                        msg = (
+                            "Required time vector information "
+                            "for Hankel post-processing is missing."
+                        )
+                        raise RuntimeError(msg)
                     time_reconstruct_original = self._time_fit_original[t_original]
             elif t is None:
                 time_reconstruct = self._time_fit
-                if self._time_fit_original is not None:
-                    # if Hankel pre-processing has been applied
+                if self._hankel_d > 1:
+                    if self._time_fit_original is None:
+                        msg = (
+                            "Required time vector information "
+                            "for Hankel post-processing is missing."
+                        )
+                        raise RuntimeError(msg)
                     time_reconstruct_original = self._time_fit_original
             else:
                 msg = "Parameter 't' must be a slice, an integer, a string or None."
