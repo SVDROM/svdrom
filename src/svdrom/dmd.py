@@ -1049,7 +1049,7 @@ class OptDMD:
                 )
                 t_stop, lag_stop = self._extract_hankel_time(t.stop)
                 t = slice(t_start, t_stop)
-                lags = (lag_start, lag_stop)
+                lags = (lag_start, lag_stop) if lag_start != lag_stop else (lag_start,)
             elif t is not None:
                 t, lag_single = self._extract_hankel_time(t)
                 lags = (lag_single,)
