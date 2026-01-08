@@ -989,8 +989,8 @@ class OptDMD:
         t: slice | int | str | None, optional
             The time span over which to perform the DMD reconstruction. If you
             have performed Hankel pre-processing, this time should nevertheless
-            be expressed in the time vector of the original data, not the Hankel
-            pre-processed data.
+            be expressed in the original data's time vector frame of reference,
+            not the Hankel pre-processed data.
             If 't' is a slice, it may contain integers or strings, where integers
             and strings are interpreted as starting and stopping indices or labels
             of the fit time vector, respectively. To reconstruct a single snapshot,
@@ -1012,8 +1012,23 @@ class OptDMD:
             The reconstructed data as an xarray.DataArray. If bagging is used,
             two xarray.DataArray are returned where the first one is the
             ensemble mean and the second one is the ensemble variance. The
-            Xarrays are NumPy-backed or Dask-backed depending on the
+            arrays are NumPy-backed or Dask-backed depending on the
             'memory_limit_bytes' parameter.
+
+        Examples
+        --------
+        Given optdmd, a fitted instance OptDMD instance:
+
+        Produce a reconstruction of the training data for Dec 2020:
+        >>> optdmd.reconstruct(slice("2020-12-01", "2020-12-31"))
+
+        Produce a reconstruction of the 10th snapshot of the training data.
+        If you had performed Hankel pre-processing, this would still refer
+        to the 10th snapshot of the original data:
+        >>> optdmd.reconstruct(10)
+
+        Reconstruct the whole training dataset, which could be huge:
+        >>> optdmd.reconstruct()
         """
         if self._solver is None:
             msg = "The OptDMD model must be fitted before reconstructing."
