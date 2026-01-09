@@ -804,9 +804,16 @@ class OptDMD:
         hankel_d: int
             Hankel rank of the input matrix. It should be an integer
             greater than or equal to 2.
+        lags: tuple[int] | tuple[int, int] | None
+            If Hankel pre-processing has been applied, a tuple containing
+            the starting and ending lag indices of the Hankel matrix to extract,
+            in the form (lag_start, lag_end). If lag_start equals lag_end, then
+            pass lags as a single-element tuple (lag,). If None, all lags are
+            extracted. Default is None.
         rechunk: bool
             Whether to rechunk the input array into column blocks
-            of n rows, where n is the length of a single snapshot.
+            of n rows, where n is the length of a single snapshot (i.e.
+            the portion of a Hankel matrix column with the same lag index).
             Default is True.
 
         Returns
@@ -1029,7 +1036,7 @@ class OptDMD:
 
         Examples
         --------
-        Given optdmd, a fitted instance OptDMD instance:
+        Given optdmd, a fitted OptDMD instance:
 
         Produce a reconstruction of the training data for Dec 2020:
         >>> optdmd.reconstruct(slice("2020-12-01", "2020-12-31"))
