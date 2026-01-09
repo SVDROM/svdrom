@@ -502,7 +502,16 @@ class OptDMD:
         )
 
         # generate the time vector representing true time of the forecast
-        forecast_start = self._time_fit[-1]
+        if self._hankel_d > 1:
+            if self._time_fit_original is None:
+                msg = (
+                    "Required time vector information "
+                    "for Hankel post-processing is missing."
+                )
+                raise RuntimeError(msg)
+            forecast_start = self._time_fit_original[-1]
+        else:
+            forecast_start = self._time_fit[-1]
         forecast_end = (
             (forecast_start + span_td)
             if self._is_datetime
@@ -987,6 +996,36 @@ class OptDMD:
             logger.exception(msg)
             raise RuntimeError(msg) from e
         logger.info("Done.")
+
+        if self._hankel_d > 1:
+            try:
+                # note that when Hankel preprocessing has been applied,
+                # we always extract the bottom row block of the forecast
+                # Hankel matrix, i.e. the rows with lag index == hankel_d - 1.
+                # This is because all previous lags of the first matrix column
+                # were already part of the fitted dataset.
+                if isinstance(forecast, tuple):
+                    forecast = cast(
+                        tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
+                        tuple(
+                            self._extract_hankel_prediction(
+                                prediction,
+                                self._hankel_d,
+                                lags=(self._hankel_d - 1,),
+                            )
+                            for prediction in forecast
+                        ),
+                    )
+                else:
+                    forecast = self._extract_hankel_prediction(
+                        forecast,
+                        self._hankel_d,
+                        lags=(self._hankel_d - 1,),
+                    )
+            except Exception as e:
+                msg = "Error extracting the forecast from the Hankel matrix."
+                logger.exception(msg)
+                raise RuntimeError(msg) from e
         try:
             return self._prediction_to_dataarray(forecast, time_forecast)
         except Exception as e:
