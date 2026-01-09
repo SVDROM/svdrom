@@ -224,8 +224,19 @@ class OptDMD:
 
     @property
     def time_fit(self) -> np.ndarray | None:
-        """The time vector for the DMD fit (read-only)."""
+        """The time vector for the DMD fit (read-only).
+        If Hankel pre-processing has been applied, this corresponds
+        to the time vector of the preprocessed data, not the original
+        time vector.
+        """
         return self._time_fit
+
+    @property
+    def time_fit_original(self) -> np.ndarray | None:
+        """The original time vector of the training data when
+        Hankel pre-processing has been applied (read-only).
+        """
+        return self._time_fit_original
 
     @property
     def parallel_bagging(self) -> bool:
