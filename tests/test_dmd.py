@@ -249,17 +249,37 @@ class BaseTestOptDMD:
             f"but got a value of {t_forecast[0] - solver._t_fit[-1]} instead."
         )
         if np.issubdtype(self.t.dtype, float):
-            assert time_forecast[0] == solver.time_fit[-1] + expected_delta_t, (
-                "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
-                f"by a value of {expected_delta_t}"
-                f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
-            )
+            if not self.hankel_preprocessing:
+                assert time_forecast[0] == solver.time_fit[-1] + expected_delta_t, (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
+                    f"by a value of {expected_delta_t} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
+            else:
+                assert (
+                    time_forecast[0] == solver.time_fit_original[-1] + expected_delta_t
+                ), (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit_original[-1] "
+                    f"by a value of {expected_delta_t} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
+
         else:
-            assert time_forecast[0] == solver.time_fit[-1] + expected_delta_time, (
-                "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
-                f"by a value of {expected_delta_time}"
-                f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
-            )
+            if not self.hankel_preprocessing:
+                assert time_forecast[0] == solver.time_fit[-1] + expected_delta_time, (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
+                    f"by a value of {expected_delta_time} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
+            else:
+                assert (
+                    time_forecast[0]
+                    == solver.time_fit_original[-1] + expected_delta_time
+                ), (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit_original[-1] "
+                    f"by a value of {expected_delta_time} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_predict(self, solver):
