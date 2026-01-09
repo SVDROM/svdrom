@@ -5,6 +5,7 @@ import pytest
 import xarray as xr
 from make_test_data import DataGenerator, SignalGenerator
 
+import svdrom.config as config
 from svdrom.dmd import OptDMD
 from svdrom.preprocessing import hankel_preprocessing
 from svdrom.svd import TruncatedSVD
@@ -39,6 +40,9 @@ class BaseTestOptDMD:
         assert hasattr(
             solver, "time_fit"
         ), "OptDMD object is missing the 'time_fit' attribute."
+        assert hasattr(
+            solver, "time_fit_original"
+        ), "OptDMD object is missing the 'time_fit_original' attribute."
         assert hasattr(
             solver, "num_trials"
         ), "OptDMD object is missing the 'num_trials' attribute."
@@ -100,14 +104,28 @@ class BaseTestOptDMD:
             "Expected 'time_fit' to be of type 'np.ndarray', "
             f"but got {type(solver.time_fit)} instead."
         )
-        np.testing.assert_equal(
-            solver.time_fit,
-            self.v.time.values,
-            strict=True,
-            err_msg=(
-                "Expected 'time_fit' vector to be strictly equal to 'v.time.values'."
-            ),
-        )
+        assert np.array_equal(
+            solver.time_fit, self.v.time.values
+        ), "Expected 'time_fit' vector to be strictly equal to 'v.time.values'."
+        if self.hankel_preprocessing:
+            assert isinstance(solver.time_fit_original, np.ndarray), (
+                "Expected 'time_fit_original' to be of type 'np.ndarray', "
+                f"but got {type(solver.time_fit_original)} instead."
+            )
+            time_mapping = self.v.attrs[config.get("hankel_time_mapping_attr")]
+            expected_time_fit_original = np.sort(list(time_mapping.keys()))
+            assert np.array_equal(
+                solver.time_fit_original, expected_time_fit_original
+            ), (
+                "Expected 'time_fit_original' vector to be strictly equal to "
+                "the keys of the Hankel time mapping dictionary."
+            )
+        else:
+            assert solver.time_fit_original is None, (
+                "Expected 'time_fit_original' to be None when "
+                "Hankel pre-processing has not been applied."
+            )
+
         assert isinstance(solver._t_fit, np.ndarray), (
             "Expected 't_fit' to be of type 'np.ndarray', "
             f"but got {type(solver._t_fit)} instead."
