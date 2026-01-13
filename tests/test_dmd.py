@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 import xarray as xr
 from make_test_data import DataGenerator, SignalGenerator
+from pydmd import BOPDMD
+from pydmd.preprocessing import hankel_preprocessing as hankel_preprocessing_pydmd
 
 import svdrom.config as config
 from svdrom.dmd import OptDMD
@@ -637,11 +639,12 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
         # convert to Dask-backed Xarray as TruncatedSVD currently only
         # supports Dask arrays
         X_d = X_d.copy(data=da.from_array(X_d.data))
-        n_components = len(cls.components) * cls.d
-        tsvd = TruncatedSVD(n_components=n_components)
+        cls.svd_rank = len(cls.components) * cls.d
+        tsvd = TruncatedSVD(n_components=cls.svd_rank)
         tsvd.fit(X_d)
         cls.u, cls.s, cls.v = tsvd.u, tsvd.s, tsvd.v
         cls.t = X_d.time
+        cls.X, cls.X_d = X, X_d
         cls.optdmd = OptDMD()
         cls.optdmd_bagging = OptDMD(num_trials=5, seed=1234)
 
@@ -695,3 +698,22 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
         assert (
             lag == expected_lag
         ), f"Expected lag to be {expected_lag}, but got {lag} instead."
+
+    def test_reconstruct_vs_pydmd(self):
+        """Test that the reconstruct() method gives a similar result
+        to PyDMD equivalent when using Hankel pre-processing.
+        """
+        optdmd_pydmd = BOPDMD(svd_rank=self.svd_rank)
+        optdmd_pydmd = hankel_preprocessing_pydmd(optdmd_pydmd, d=self.d)
+        optdmd_pydmd.fit(self.X.values, self.t)
+        reconstruction_pydmd = optdmd_pydmd.reconstructed_data.real
+        reconstruction = self.optdmd.reconstruct().values.real
+        # check that the relative Frobenius error is small
+        rel_error = np.linalg.norm(
+            reconstruction - reconstruction_pydmd
+        ) / np.linalg.norm(reconstruction)
+        threshold = 1e-4
+        assert rel_error < threshold, (
+            "The relative Frobenius error between the SVD-ROM and PyDMD "
+            f"reconstructions is {rel_error:.4f}. The threshold is {threshold:.4f}."
+        )
