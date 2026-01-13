@@ -825,11 +825,10 @@ class OptDMD:
             Hankel rank of the input matrix. It should be an integer
             greater than or equal to 2.
         lags: tuple[int] | tuple[int, int] | None
-            If Hankel pre-processing has been applied, a tuple containing
-            the starting and ending lag indices of the Hankel matrix to extract,
-            in the form (lag_start, lag_end). If lag_start equals lag_end, then
-            pass lags as a single-element tuple (lag,). If None, all lags are
-            extracted. Default is None.
+            A tuple containing the starting and ending lag indices of the
+            Hankel matrix to extract, in the form (lag_start, lag_end).
+            If lag_start equals lag_end, then pass lags as a single-element
+            tuple (lag,). If None, all lags are extracted. Default is None.
         rechunk: bool
             Whether to rechunk the input array into column blocks
             of n rows, where n is the length of a single snapshot (i.e.
