@@ -937,6 +937,44 @@ class OptDMD:
         )
         return (np.prod(array_shape) * np.dtype(dtype).itemsize).item()
 
+    def _apply_hankel_postprocessing(
+        self,
+        prediction: np.ndarray
+        | da.Array
+        | tuple[np.ndarray, np.ndarray]
+        | tuple[da.Array, da.Array],
+        lags: tuple[int] | tuple[int, int] | None = None,
+    ) -> (
+        np.ndarray
+        | da.Array
+        | tuple[np.ndarray, np.ndarray]
+        | tuple[da.Array, da.Array]
+    ):
+        """Helper function to call _extract_hankel_prediction() on a DMD
+        prediction (a reconstruction or a forecast), deterministic or
+        probabilistic (an array or a tuple of arrays), on which Hankel
+        pre-processing has been applied.
+        """
+        if isinstance(prediction, tuple):
+            prediction = cast(
+                tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
+                tuple(
+                    self._extract_hankel_prediction(
+                        pred,
+                        self._hankel_d,
+                        lags,
+                    )
+                    for pred in prediction
+                ),
+            )
+        else:
+            prediction = self._extract_hankel_prediction(
+                prediction,
+                self._hankel_d,
+                lags,
+            )
+        return prediction
+
     def forecast(
         self,
         forecast_span: str | int,
@@ -1015,24 +1053,9 @@ class OptDMD:
                 # Hankel matrix, i.e. the rows with lag index == hankel_d - 1.
                 # This is because all previous lags of the first matrix column
                 # were already part of the fitted dataset.
-                if isinstance(forecast, tuple):
-                    forecast = cast(
-                        tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
-                        tuple(
-                            self._extract_hankel_prediction(
-                                prediction,
-                                self._hankel_d,
-                                lags=(self._hankel_d - 1,),
-                            )
-                            for prediction in forecast
-                        ),
-                    )
-                else:
-                    forecast = self._extract_hankel_prediction(
-                        forecast,
-                        self._hankel_d,
-                        lags=(self._hankel_d - 1,),
-                    )
+                forecast = self._apply_hankel_postprocessing(
+                    forecast, lags=(self._hankel_d - 1,)
+                )
             except Exception as e:
                 msg = "Error extracting the forecast from the Hankel matrix."
                 logger.exception(msg)
@@ -1224,24 +1247,10 @@ class OptDMD:
         # relevant snapshots from the computed reconstruction matrix
         if self._hankel_d > 1:
             try:
-                if isinstance(reconstruction, tuple):
-                    reconstruction = cast(
-                        tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
-                        tuple(
-                            self._extract_hankel_prediction(
-                                recon,
-                                self._hankel_d,
-                                lags,
-                            )
-                            for recon in reconstruction
-                        ),
-                    )
-                else:
-                    reconstruction = self._extract_hankel_prediction(
-                        reconstruction,
-                        self._hankel_d,
-                        lags,
-                    )
+                reconstruction = self._apply_hankel_postprocessing(
+                    reconstruction,
+                    lags,
+                )
                 time_reconstruct = time_reconstruct_original
             except Exception as e:
                 msg = "Error extracting the reconstuction from the Hankel matrix."
