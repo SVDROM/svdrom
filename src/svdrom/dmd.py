@@ -122,7 +122,7 @@ class OptDMD:
         self._is_datetime: bool = False  # internal use only
         self._dynamics: xr.DataArray | None = None
         self._hankel_d: int = 1
-        self._hankel_time_mapping: dict | None = None
+        self._hankel_time_mapping: dict | None = None  # internal use only
 
     @property
     def n_modes(self) -> int:
@@ -588,6 +588,12 @@ class OptDMD:
         **kwargs:
             Additional keyword arguments to pass to PyDMD's BOPDMD constructor.
             See https://pydmd.github.io/PyDMD/bopdmd.html for more info.
+
+        Notes
+        -----
+        To perform a DMD fit on a Hankel pre-processed (a.k.a. time-delay embedding)
+        matrix, 'u', 's' and 'v' must come from the singular value decomposition
+        of the Hankel pre-processed matrix via the TruncatedSVD class.
         """
         self._check_svd_inputs(u, s, v)
         if self._n_modes > len(s):
