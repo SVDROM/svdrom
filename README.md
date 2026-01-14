@@ -1,5 +1,6 @@
 # SVD-ROM
 
+[![All Contributors](https://img.shields.io/github/all-contributors/SVDROM/svdrom?color=ee8449&style=flat-square)](#contributors)
 [![Actions Status][actions-badge]][actions-link]
 [![PyPI version][pypi-version]][pypi-link]
 [![PyPI platforms][pypi-platforms]][pypi-link]
@@ -49,5 +50,4 @@ Distributed under the terms of the [MIT license](LICENSE).
 [pypi-link]:                https://pypi.org/project/svdrom/
 [pypi-platforms]:           https://img.shields.io/pypi/pyversions/svdrom
 [pypi-version]:             https://img.shields.io/pypi/v/svdrom
-[![All Contributors](https://img.shields.io/github/all-contributors/SVDROM/svdrom?color=ee8449&style=flat-square)](#contributors)
 <!-- prettier-ignore-end -->
