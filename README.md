@@ -31,6 +31,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
 
 Distributed under the terms of the [MIT license](LICENSE).
 
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
 
 <!-- prettier-ignore-start -->
 [actions-badge]:            https://github.com/dsj976/svdrom/workflows/CI/badge.svg
