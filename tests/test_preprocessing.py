@@ -162,7 +162,7 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         original_time_vector,
     ), (
         "Expected the original time vector to be saved in a dictionary as an "
-        f"attribute with the name {config.get("hankel_time_mapping_attr")}."
+        f"attribute with the name {config.get('hankel_time_mapping_attr')}."
     )
 
     assert np.array_equal(

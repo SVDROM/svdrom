@@ -318,7 +318,7 @@ class OptDMD:
         if config.get("hankel_coord_name") in u.coords:
             if u[config.get("hankel_coord_name")].dims[0] != u.dims[0]:
                 msg = (
-                    f"The dimension of the {config.get("hankel_coord_name")} "
+                    f"The dimension of the {config.get('hankel_coord_name')} "
                     "coordinate should be the same as the first dimension of the "
                     "left singular vectors 'u'."
                 )
@@ -326,7 +326,7 @@ class OptDMD:
                 raise ValueError(msg)
             if np.any(np.unique(u[config.get("hankel_coord_name")].values) < 0):
                 msg = (
-                    f"The {config.get("hankel_coord_name")} coordinate should only "
+                    f"The {config.get('hankel_coord_name')} coordinate should only "
                     "contain values greater than or equal to zero."
                 )
                 logger.exception(msg)
@@ -334,9 +334,9 @@ class OptDMD:
             if config.get("hankel_time_mapping_attr") not in v.attrs:
                 msg = (
                     "Given the left singular vectors (u) contain a "
-                    f"{config.get("hankel_coord_name")} coordinate, expected "
+                    f"{config.get('hankel_coord_name')} coordinate, expected "
                     "right singular vectors (v) to contain a "
-                    f"{config.get("hankel_time_mapping_attr")} attribute."
+                    f"{config.get('hankel_time_mapping_attr')} attribute."
                 )
 
     def _get_time_conversion_factor(self, from_units: str, to_units: str) -> float:
