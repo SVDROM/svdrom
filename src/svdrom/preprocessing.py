@@ -236,4 +236,5 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         attrs={
             config.get("hankel_time_mapping_attr"): hankel_time_mapping,
         },
+        name="Hankel pre-processed data",
     )
