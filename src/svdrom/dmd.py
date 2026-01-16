@@ -855,8 +855,11 @@ class OptDMD:
         if rechunk and isinstance(prediction, da.Array):
             prediction = prediction.rechunk({0: n, 1: 1})
         snapshots = prediction[:, 0].reshape(hankel_d, -1).T
-        if lags:
-            snapshots = snapshots[:, lags]
+        if lags is not None:
+            if len(lags) == 1:
+                snapshots = snapshots[:, lags[0] : lags[0] + 1]
+            else:
+                snapshots = snapshots[:, lags[0] : lags[1] + 1]
         if t > 1:
             if isinstance(prediction, da.Array):
                 snapshots = da.concatenate([snapshots, prediction[-n:, 1:]], axis=1)

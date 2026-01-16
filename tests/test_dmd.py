@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import dask
 import dask.array as da
 import numpy as np
@@ -648,9 +650,18 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
         cls.optdmd = OptDMD()
         cls.optdmd_bagging = OptDMD(num_trials=5, seed=1234)
 
+    # set up multiple (hankel_d, lags) combinations for the next test
+    params: ClassVar[dict[int, list]] = {
+        2: [None, (0, 1), (1,)],
+        3: [None, (0, 2), (1, 2), (2,)],
+    }
+    cases: ClassVar[list[tuple]] = [
+        (hankel_d, lag) for hankel_d, lags in params.items() for lag in lags
+    ]
+
     @pytest.mark.parametrize("array_type", ["numpy", "dask"])
-    @pytest.mark.parametrize("hankel_d", [2, 3])
-    def test_extract_hankel_prediction(self, array_type, hankel_d):
+    @pytest.mark.parametrize(("hankel_d", "lags"), cases)
+    def test_extract_hankel_prediction(self, array_type, hankel_d, lags):
         """Test for the extract_hankel_prediction method."""
         arr = np.random.randn(100, 10)
         if array_type == "dask":
@@ -666,14 +677,15 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
             },
         )
         X_d = hankel_preprocessing(X, hankel_d)
-        X_extracted = self.optdmd._extract_hankel_prediction(X_d.data, hankel_d)
+        X_extracted = self.optdmd._extract_hankel_prediction(X_d.data, hankel_d, lags)
+        ind = slice(lags[0], X.shape[-1]) if lags else slice(X.shape[-1])
         if isinstance(X_extracted, da.Array):
-            assert np.array_equal(X_extracted.compute(), X.values), (
+            assert np.array_equal(X_extracted.compute(), X.values[:, ind]), (
                 "Expected the output of extract_hankel_preprocessing() "
                 "to match the input of hankel_preprocessing()."
             )
         else:
-            assert np.array_equal(X_extracted, X.values), (
+            assert np.array_equal(X_extracted, X.values[:, ind]), (
                 "Expected the output of extract_hankel_preprocessing() "
                 "to match the input of hankel_preprocessing()."
             )
