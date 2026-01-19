@@ -681,17 +681,17 @@ class OptDMD:
             raise RuntimeError(msg)
 
         dims = (self._modes.dims[0], self._time_dimension)
-        coords = {k: v for k, v in self._modes.coords.items() if k != "components"}
+        # if Hankel pre-processing has been applied, drop the
+        # duplicate dimension values along the first dimension,
+        # i.e. keep only coordinates associated with lag=0,
+        # and drop the Hankel lag coordinate
         if self._hankel_d > 1:
-            # If Hankel pre-processing has been used, keep only the spatial
-            # locations/samples associated with the zero-lag, and remove the
-            # lag coordinate
-            coords[dims[0]] = (
-                coords[dims[0]]
-                .sel({dims[0]: coords[dims[0]][config.get("hankel_coord_name")] == 0})
-                .drop_vars(config.get("hankel_coord_name"))
+            modes = self._modes.drop_duplicates(dims[0], keep="first").drop_vars(
+                config.get("hankel_coord_name")
             )
-            del coords[config.get("hankel_coord_name")]
+        else:
+            modes = self._modes
+        coords = {k: v for k, v in modes.coords.items() if k != "components"}
         coords[self._time_dimension] = time_prediction
         if isinstance(prediction, (np.ndarray | da.Array)):
             return xr.DataArray(
