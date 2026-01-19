@@ -173,8 +173,9 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         If it is Dask-backed, then the returned DataArray is also Dask-backed.
         The returned DataArray has a new coordinate which indicates the time
         delay relative to the current time stamp. It also contains a new attribute
-        that maps each original snapshot to the time-delay embedded snapshots in
-        which it appears.
+        (a dictionary) that maps each original snapshot to a tuple consisting of
+        the first time-delay embedded snapshot in which it appears and the
+        corresponding lag index.
     """
     if X.ndim != 2:
         msg = "The input array must be two dimensional."
@@ -210,17 +211,16 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
             names=X.indexes[dims[0]].names,
         )
 
-    # map each original snapshot to the time-delay embedded
-    # snapshots in which it appears
+    # map each original snapshot to the first time-delay
+    # embedded snapshot in which it appears and to the
+    # corresponding lag index
     original_time = X[dims[1]].values
     hankel_time_mapping = {}
     for i, time in enumerate(original_time):
         if i - d < 0:
-            hankel_time_mapping[time] = original_time[: i + 1]
-        elif i - d >= 0 and i + d <= len(original_time):
-            hankel_time_mapping[time] = original_time[i - d + 1 : i + 1]
+            hankel_time_mapping[time] = (original_time[0], i)
         else:
-            hankel_time_mapping[time] = original_time[i - d + 1 : -d + 1]
+            hankel_time_mapping[time] = (original_time[i - d + 1], d - 1)
 
     return xr.DataArray(
         X_delayed,

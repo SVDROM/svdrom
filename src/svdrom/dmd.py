@@ -912,14 +912,12 @@ class OptDMD:
             raise RuntimeError(msg)
         if isinstance(t, str):
             try:
-                snapshot_list = self._hankel_time_mapping[np.datetime64(t)]
-                first_snapshot = snapshot_list[0]
+                first_snapshot: tuple = self._hankel_time_mapping[np.datetime64(t)]
             except Exception as e:
                 msg = f"Can't find snapshot {t} in the data's original time vector."
                 logger.exception(msg)
                 raise ValueError(msg) from e
-            lag = len(snapshot_list) - 1
-            return first_snapshot.astype(str), lag
+            return first_snapshot[0].astype(str), first_snapshot[1]
         if t < 0:
             if abs(t) > len(self._hankel_time_mapping) - self._hankel_d + 1:
                 msg = "Negative index is out of bounds. Try using a positive index."
