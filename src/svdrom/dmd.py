@@ -1144,7 +1144,7 @@ class OptDMD:
                 return slice(start, stop)
             return np.datetime64(s, "s").astype(str)
 
-        def _check_slice_type(t: slice) -> str:
+        def check_slice_type(t: slice) -> str:
             """Check if the slice is index or label based."""
             if (isinstance(t.start, int) or t.start is None) and isinstance(
                 t.stop, int
@@ -1160,7 +1160,7 @@ class OptDMD:
 
         # if the requested time span is labelled based, reformat it to second-level
         # precision
-        if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
+        if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
             t, str
         ):
             t = normalize_datetime_string(t)
@@ -1186,7 +1186,7 @@ class OptDMD:
         # now, compute the reconstruction time vector so that we can compute
         # the prediction
         try:
-            if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
+            if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
                 t, str
             ):
                 time_fit = xr.DataArray(
@@ -1209,7 +1209,7 @@ class OptDMD:
                         time=t_original
                     ).values
             elif (
-                isinstance(t, slice) and _check_slice_type(t) == "index"
+                isinstance(t, slice) and check_slice_type(t) == "index"
             ) or isinstance(t, int):
                 time_reconstruct = self._time_fit[t]
                 if self._hankel_d > 1:
