@@ -1136,6 +1136,14 @@ class OptDMD:
             msg = "The OptDMD fit time vector is not available."
             raise RuntimeError(msg)
 
+        def normalize_datetime_string(s: slice | str) -> slice | str:
+            """Reformat datetime strings to contain second-level precision."""
+            if isinstance(s, slice):
+                start = np.datetime64(s.start, "s").astype(str) if s.start else None
+                stop = np.datetime64(s.stop, "s").astype(str)
+                return slice(start, stop)
+            return np.datetime64(s, "s").astype(str)
+
         def _check_slice_type(t: slice) -> str:
             """Check if the slice is index or label based."""
             if (isinstance(t.start, int) or t.start is None) and isinstance(
@@ -1149,6 +1157,13 @@ class OptDMD:
             msg = "Slice must contain time coordinate indices or labels."
             logger.exception(msg)
             raise ValueError(msg)
+
+        # if the requested time span is labelled based, reformat it to second-level
+        # precision
+        if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
+            t, str
+        ):
+            t = normalize_datetime_string(t)
 
         # convert the requested time span in the original time vector frame of
         # reference to the corresponding span in the Hankel time vector, and
