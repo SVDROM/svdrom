@@ -1,5 +1,6 @@
 # SVD-ROM
 
+[![All Contributors](https://img.shields.io/github/all-contributors/SVDROM/svdrom?color=ee8449&style=flat-square)](#contributors)
 [![Actions Status][actions-badge]][actions-link]
 [![PyPI version][pypi-version]][pypi-link]
 [![PyPI platforms][pypi-platforms]][pypi-link]
@@ -30,6 +31,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
 ## License
 
 Distributed under the terms of the [MIT license](LICENSE).
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 
 <!-- prettier-ignore-start -->
