@@ -642,6 +642,18 @@ class OptDMD:
 
         return self
 
+    @staticmethod
+    def _rechunk_along_columns(arr: da.Array) -> da.Array:
+        """Rechunk a Dask matrix along the columns (i.e. the time dimension),
+        which allows to more efficiently unstack the spatial dimension
+        (the rows) if necessary. The target chunk size is based on the Dask
+        config default.
+        """
+        target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
+        bytes_per_snapshot = arr[:, 0].nbytes
+        time_chunk_size = round(target_chunk_bytes / bytes_per_snapshot)
+        return arr.rechunk((-1, time_chunk_size))
+
     def _prediction_to_dataarray(
         self,
         prediction: np.ndarray
@@ -753,14 +765,7 @@ class OptDMD:
         predictions = []
 
         if use_dask:
-            # Use Dask to compute the prediction, chunking along
-            # the time dimension, which allows to more efficiently
-            # unstack the spatial dimension if necessary.
-            # The target chunk size is based on the Dask config default.
-            target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
-            bytes_per_snapshot = self._modes[:, 0].nbytes
-            time_chunk_size = round(target_chunk_bytes / bytes_per_snapshot)
-
+            # use Dask to compute the prediction
             modes_da = da.from_array(self._modes, chunks=(-1, -1))
             if self._eigs_std is not None and self._amplitudes_std is not None:
                 # when bagging has been used, use Monte-Carlo uncertainty propagation
@@ -769,9 +774,8 @@ class OptDMD:
                     # draw eigenvalues and amplitudes from random distribution
                     eigs, amps = draw_from_rand_distr(rng)
                     amps_da = da.from_array(np.diag(amps), chunks=(-1, -1))
-                    exp_da = da.from_array(
-                        np.exp(np.outer(eigs, t)), chunks=(-1, time_chunk_size)
-                    )
+                    exp_da = da.from_array(np.exp(np.outer(eigs, t)))
+                    exp_da = self._rechunk_along_columns(exp_da)
                     # compute a prediction realization
                     prediction_da = da.dot(modes_da, da.dot(amps_da, exp_da))
                     predictions.append(prediction_da)
@@ -786,8 +790,8 @@ class OptDMD:
             )
             exp_da = da.from_array(
                 np.exp(np.outer(self._eigs, t)),
-                chunks=(-1, time_chunk_size),
             )
+            exp_da = self._rechunk_along_columns(exp_da)
             return da.dot(modes_da, da.dot(amps_da, exp_da))
 
         # use NumPy to compute the prediction
@@ -959,27 +963,33 @@ class OptDMD:
         """Helper function to call _extract_hankel_prediction() on a DMD
         prediction (a reconstruction or a forecast), deterministic or
         probabilistic (an array or a tuple of arrays), on which Hankel
-        pre-processing has been applied.
+        pre-processing has been applied. The function will perform rechunking
+        along the columns (i.e. the temporal dimension) if the prediction is
+        a Dask array.
         """
         if isinstance(prediction, tuple):
-            prediction = cast(
-                tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
-                tuple(
-                    self._extract_hankel_prediction(
-                        pred,
-                        self._hankel_d,
-                        lags,
-                    )
-                    for pred in prediction
-                ),
+            preds = []
+            for p in prediction:
+                pred = self._extract_hankel_prediction(
+                    p,
+                    self._hankel_d,
+                    lags,
+                )
+                pred = (
+                    self._rechunk_along_columns(pred)
+                    if isinstance(pred, da.Array)
+                    else pred
+                )
+                preds.append(pred)
+            return cast(
+                tuple[da.Array, da.Array] | tuple[np.ndarray, np.ndarray], tuple(preds)
             )
-        else:
-            prediction = self._extract_hankel_prediction(
-                prediction,
-                self._hankel_d,
-                lags,
-            )
-        return prediction
+        pred = self._extract_hankel_prediction(
+            prediction,
+            self._hankel_d,
+            lags,
+        )
+        return self._rechunk_along_columns(pred) if isinstance(pred, da.Array) else pred
 
     def forecast(
         self,
