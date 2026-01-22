@@ -642,15 +642,17 @@ class OptDMD:
 
         return self
 
-    @staticmethod
-    def _rechunk_along_columns(arr: da.Array) -> da.Array:
+    def _rechunk_along_columns(self, arr: da.Array) -> da.Array:
         """Rechunk a Dask matrix along the columns (i.e. the time dimension),
         which allows to more efficiently unstack the spatial dimension
         (the rows) if necessary. The target chunk size is based on the Dask
         config default.
         """
+        if self._modes is None:
+            msg = "The model has not been fitted. Can't calculate bytes per snapshot."
+            raise RuntimeError(msg)
         target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
-        bytes_per_snapshot = arr[:, 0].nbytes
+        bytes_per_snapshot = self._modes[:, 0].nbytes
         time_chunk_size = round(target_chunk_bytes / bytes_per_snapshot)
         return arr.rechunk((-1, time_chunk_size))
 
