@@ -649,6 +649,20 @@ class OptDMD:
 
         return self
 
+    def _rechunk_along_columns(self, arr: da.Array) -> da.Array:
+        """Rechunk a Dask matrix along the columns (i.e. the time dimension),
+        which allows to more efficiently unstack the spatial dimension
+        (the rows) if necessary. The target chunk size is based on the Dask
+        config default.
+        """
+        if self._modes is None:
+            msg = "The model has not been fitted. Can't calculate bytes per snapshot."
+            raise RuntimeError(msg)
+        target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
+        bytes_per_snapshot = self._modes[:, 0].nbytes
+        time_chunk_size = round(target_chunk_bytes / bytes_per_snapshot)
+        return arr.rechunk((-1, time_chunk_size))
+
     def _prediction_to_dataarray(
         self,
         prediction: np.ndarray
@@ -760,14 +774,7 @@ class OptDMD:
         predictions = []
 
         if use_dask:
-            # Use Dask to compute the prediction, chunking along
-            # the time dimension, which allows to more efficiently
-            # unstack the spatial dimension if necessary.
-            # The target chunk size is based on the Dask config default.
-            target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
-            bytes_per_snapshot = self._modes[:, 0].nbytes
-            time_chunk_size = round(target_chunk_bytes / bytes_per_snapshot)
-
+            # use Dask to compute the prediction
             modes_da = da.from_array(self._modes, chunks=(-1, -1))
             if self._eigs_std is not None and self._amplitudes_std is not None:
                 # when bagging has been used, use Monte-Carlo uncertainty propagation
@@ -776,9 +783,8 @@ class OptDMD:
                     # draw eigenvalues and amplitudes from random distribution
                     eigs, amps = draw_from_rand_distr(rng)
                     amps_da = da.from_array(np.diag(amps), chunks=(-1, -1))
-                    exp_da = da.from_array(
-                        np.exp(np.outer(eigs, t)), chunks=(-1, time_chunk_size)
-                    )
+                    exp_da = da.from_array(np.exp(np.outer(eigs, t)))
+                    exp_da = self._rechunk_along_columns(exp_da)
                     # compute a prediction realization
                     prediction_da = da.dot(modes_da, da.dot(amps_da, exp_da))
                     predictions.append(prediction_da)
@@ -793,8 +799,8 @@ class OptDMD:
             )
             exp_da = da.from_array(
                 np.exp(np.outer(self._eigs, t)),
-                chunks=(-1, time_chunk_size),
             )
+            exp_da = self._rechunk_along_columns(exp_da)
             return da.dot(modes_da, da.dot(amps_da, exp_da))
 
         # use NumPy to compute the prediction
@@ -978,27 +984,33 @@ class OptDMD:
         """Helper function to call _extract_hankel_prediction() on a DMD
         prediction (a reconstruction or a forecast), deterministic or
         probabilistic (an array or a tuple of arrays), on which Hankel
-        pre-processing has been applied.
+        pre-processing has been applied. The function will perform rechunking
+        along the columns (i.e. the temporal dimension) if the prediction is
+        a Dask array.
         """
         if isinstance(prediction, tuple):
-            prediction = cast(
-                tuple[np.ndarray, np.ndarray] | tuple[da.Array, da.Array],
-                tuple(
-                    self._extract_hankel_prediction(
-                        pred,
-                        self._hankel_d,
-                        lags,
-                    )
-                    for pred in prediction
-                ),
+            preds = []
+            for p in prediction:
+                pred = self._extract_hankel_prediction(
+                    p,
+                    self._hankel_d,
+                    lags,
+                )
+                pred = (
+                    self._rechunk_along_columns(pred)
+                    if isinstance(pred, da.Array)
+                    else pred
+                )
+                preds.append(pred)
+            return cast(
+                tuple[da.Array, da.Array] | tuple[np.ndarray, np.ndarray], tuple(preds)
             )
-        else:
-            prediction = self._extract_hankel_prediction(
-                prediction,
-                self._hankel_d,
-                lags,
-            )
-        return prediction
+        pred = self._extract_hankel_prediction(
+            prediction,
+            self._hankel_d,
+            lags,
+        )
+        return self._rechunk_along_columns(pred) if isinstance(pred, da.Array) else pred
 
     def forecast(
         self,
@@ -1155,7 +1167,15 @@ class OptDMD:
             msg = "The OptDMD fit time vector is not available."
             raise RuntimeError(msg)
 
-        def _check_slice_type(t: slice) -> str:
+        def normalize_datetime_string(s: slice | str) -> slice | str:
+            """Reformat datetime strings to contain second-level precision."""
+            if isinstance(s, slice):
+                start = np.datetime64(s.start, "s").astype(str) if s.start else None
+                stop = np.datetime64(s.stop, "s").astype(str)
+                return slice(start, stop)
+            return np.datetime64(s, "s").astype(str)
+
+        def check_slice_type(t: slice) -> str:
             """Check if the slice is index or label based."""
             if (isinstance(t.start, int) or t.start is None) and isinstance(
                 t.stop, int
@@ -1168,6 +1188,13 @@ class OptDMD:
             msg = "Slice must contain time coordinate indices or labels."
             logger.exception(msg)
             raise ValueError(msg)
+
+        # if the requested time span is labelled based, reformat it to second-level
+        # precision
+        if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
+            t, str
+        ):
+            t = normalize_datetime_string(t)
 
         # convert the requested time span in the original time vector frame of
         # reference to the corresponding span in the Hankel time vector, and
@@ -1190,7 +1217,7 @@ class OptDMD:
         # now, compute the reconstruction time vector so that we can compute
         # the prediction
         try:
-            if (isinstance(t, slice) and _check_slice_type(t) == "label") or isinstance(
+            if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
                 t, str
             ):
                 time_fit = xr.DataArray(
@@ -1213,7 +1240,7 @@ class OptDMD:
                         time=t_original
                     ).values
             elif (
-                isinstance(t, slice) and _check_slice_type(t) == "index"
+                isinstance(t, slice) and check_slice_type(t) == "index"
             ) or isinstance(t, int):
                 time_reconstruct = self._time_fit[t]
                 if self._hankel_d > 1:
