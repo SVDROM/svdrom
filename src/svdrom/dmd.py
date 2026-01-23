@@ -274,6 +274,11 @@ class OptDMD:
             ),
             axis=0,
         )
+        # if modes_averaged.shape[0] % hankel_d != 0:
+        #     raise ValueError(
+        #         f"Number of rows ({modes_averaged.shape[0]}) must be divisible by hankel_d ({hankel_d})"
+        #     )
+            
         dim0 = modes.dims[0]
         modes = modes.sel(
             {dim0: modes[config.get("hankel_coord_name")] == 0}
@@ -338,6 +343,8 @@ class OptDMD:
                     "right singular vectors (v) to contain a "
                     f"{config.get('hankel_time_mapping_attr')} attribute."
                 )
+                logger.exception(msg)
+                raise ValueError(msg)
 
     def _get_time_conversion_factor(self, from_units: str, to_units: str) -> float:
         """Get the time conversion factor from one unit of time to another.
@@ -839,6 +846,9 @@ class OptDMD:
             Whether to rechunk the input array into column blocks
             of n rows, where n is the length of a single snapshot (i.e.
             the portion of a Hankel matrix column with the same lag index).
+            Set to False if your arrayis already chunked appropriately (row chunks divisible by n) or
+            if the time dimension is very large and you want to avoid
+            creating many small chunks.
             Default is True.
 
         Returns
@@ -853,7 +863,11 @@ class OptDMD:
         n = prediction.shape[0] // hankel_d
         t = prediction.shape[1]
         if rechunk and isinstance(prediction, da.Array):
-            prediction = prediction.rechunk({0: n, 1: 1})
+            # Ensure rows are chunked in multiples of n (original sample size)
+            # but don't over-fragment the time dimension
+            # prediction = prediction.rechunk({0: n, 1: 1})
+            target_time_chunks = max(1, prediction.shape[1] // 10)  # ~10 chunks along time
+            prediction = prediction.rechunk({0: n, 1: target_time_chunks})
         snapshots = prediction[:, 0].reshape(hankel_d, -1).T
         if lags is not None:
             if len(lags) == 1:
@@ -920,7 +934,12 @@ class OptDMD:
             return first_snapshot[0].astype(str), first_snapshot[1]
         if t < 0:
             if abs(t) > len(self._hankel_time_mapping) - self._hankel_d + 1:
-                msg = "Negative index is out of bounds. Try using a positive index."
+                n_accessible = len(self._hankel_time_mapping) - self._hankel_d + 1
+                msg = (
+                    f"Negative index {t} is out of bounds. With Hankel rank {self._hankel_d} "
+                    f"and {len(self._hankel_time_mapping)} original snapshots, valid negative "
+                    f"indices are -{n_accessible} to -1. Consider using a positive index for clarity."
+                )
                 logger.exception(msg)
                 raise ValueError(msg)
             return t, self._hankel_d - 1

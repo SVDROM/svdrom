@@ -35,6 +35,8 @@ def set(**kwargs):
     """
     for k, v in kwargs.items():
         if k in _editable_config:
+            if k == "stack_coord_name" and (not isinstance(v, str) or not v):
+                raise ValueError("stack_coord_name must be a non-empty string")
             _editable_config[k] = v
         else:
             msg = (

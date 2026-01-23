@@ -204,7 +204,7 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         raise ValueError(msg)
 
     dims = X.dims
-    samples: Any = np.tile(X[dims[0]].to_numpy(), d)
+    samples: np.ndarray | pd.MultiIndex = np.tile(X[dims[0]].to_numpy(), d)
     if isinstance(X.indexes[dims[0]], pd.MultiIndex):
         samples = pd.MultiIndex.from_tuples(
             samples,
@@ -216,11 +216,27 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
     # corresponding lag index
     original_time = X[dims[1]].values
     hankel_time_mapping = {}
-    for i, time in enumerate(original_time):
-        if i - d < 0:
-            hankel_time_mapping[time] = (original_time[0], i)
-        else:
-            hankel_time_mapping[time] = (original_time[i - d + 1], d - 1)
+
+    # For each original timestamp, map to (first_hankel_timestamp, lag_index)
+    # where the original snapshot first appears in the Hankel matrix.
+    # - For early snapshots (i < d): they first appear at hankel_time[0] with lag=i
+    # - For later snapshots (i >= d): they first appear at hankel_time[i-d+1] with lag=d-1
+
+    # for i, time in enumerate(original_time):
+    #     if i - d < 0:
+    #         hankel_time_mapping[time] = (original_time[0], i)
+    #     else:
+    #         hankel_time_mapping[time] = (original_time[i - d + 1], d - 1)
+
+    for i in range(d - 1):
+        hankel_time_mapping[original_time[i]] = (original_time[0], i)
+
+    # Handle the steady state (bulk)
+    # We can zip the offset arrays to avoid index math inside the loop
+    steady_times = original_time[d-1:] # index < d-1, the times we are mapping 
+    mapped_times = original_time[:len(steady_times)] # index >= d-1, the times they map to
+    for t_current, t_mapped in zip(steady_times, mapped_times): # zip pairs them up t2->t0, t3->t1, etc. 
+        hankel_time_mapping[t_current] = (t_mapped, d - 1)
 
     return xr.DataArray(
         X_delayed,
