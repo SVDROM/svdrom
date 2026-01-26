@@ -6,15 +6,16 @@ from utils import (
 )
 
 era5_path = "gs://weatherbench2/datasets/era5/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2"
-era5 = xr.open_zarr(era5_path, chunks={"time": "auto"})
+era5 = xr.open_zarr(era5_path, chunks={"time": 1})
 
-variable = "u_component_of_wind"
-level = 100
+variable = "2m_temperature"
+# level = 100
 latitude = slice(90, 30)
 hours = 12
 start_date, end_date = "1980-01-01", "2022-12-31"
 
-era5 = era5[variable].sel(level=level, time=slice(start_date, end_date), latitude=latitude)
+# era5 = era5[variable].sel(level=level, time=slice(start_date, end_date), latitude=latitude)
+era5 = era5[variable].sel(time=slice(start_date, end_date), latitude=latitude)
 era5 = resample_array(era5, hours=hours)
 
 time_periods = generate_time_ranges(start_date, end_date, num_periods=4)
