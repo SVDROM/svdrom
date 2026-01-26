@@ -7,9 +7,7 @@
 #SBATCH --job-name download_era5
 #SBATCH --output download_era5.log
 
-module purge
-module load baskerville
-module load Python/3.10.8-GCCcore-12.2.0
+source ../load_python.sh
 
 source ../.venv/bin/activate
 echo $(which python)
