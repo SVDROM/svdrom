@@ -1085,6 +1085,128 @@ class OptDMD:
             logger.exception(msg)
             raise RuntimeError(msg) from e
 
+    def _generate_reconstruct_time_vector(
+        self,
+        t: slice | int | str | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, (tuple | None)]:
+        """Given the user-provided time span over which to produce
+        the reconstruction, generate the time vector required to compute
+        the reconstruction, the true time vector of this reconstruction,
+        and the corresponding lag indices of the Hankel matrix (if
+        Hankel pre-processing has been performed).
+        """
+        # TODO: add unit tests for this helper method
+        if self._time_fit is None or self._t_fit is None:
+            msg = "The OptDMD fit time vector is not available."
+            raise RuntimeError(msg)
+
+        def normalize_datetime_string(s: slice | str) -> slice | str:
+            """Reformat datetime strings to contain second-level precision."""
+            if isinstance(s, slice):
+                start = np.datetime64(s.start, "s").astype(str) if s.start else None
+                stop = np.datetime64(s.stop, "s").astype(str)
+                return slice(start, stop)
+            return np.datetime64(s, "s").astype(str)
+
+        def check_slice_type(t: slice) -> str:
+            """Check if the slice is index or label based."""
+            if (isinstance(t.start, int) or t.start is None) and isinstance(
+                t.stop, int
+            ):
+                return "index"
+            if (isinstance(t.start, str) or t.start is None) and isinstance(
+                t.stop, str
+            ):
+                return "label"
+            msg = "Slice must contain time coordinate indices or labels."
+            logger.exception(msg)
+            raise ValueError(msg)
+
+        # if the requested time span is label based, reformat it to second-level
+        # precision
+        if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
+            t, str
+        ):
+            t = normalize_datetime_string(t)
+
+        # If Hankel pre-processing has been applied:
+        # convert the requested time span in the original time vector frame of
+        # reference to the corresponding span in the Hankel time vector, and
+        # obtain the associated lag indices of the Hankel pre-processed matrix
+        lags: tuple[int, int] | tuple[int] | None = None
+        t_original: slice | int | str | None = None
+        if self._hankel_d > 1:
+            t_original = t
+            if isinstance(t, slice):
+                t_start, lag_start = (
+                    self._extract_hankel_time(t.start) if t.start else (None, 0)
+                )
+                t_stop, lag_stop = self._extract_hankel_time(t.stop)
+                t = slice(t_start, t_stop)
+                lags = (lag_start, lag_stop) if lag_start != lag_stop else (lag_start,)
+            elif t is not None:
+                t, lag_single = self._extract_hankel_time(t)
+                lags = (lag_single,)
+
+        # now we can compute the reconstruction time vector
+        time_reconstruct_original: np.ndarray = np.empty(0)
+        if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
+            t, str
+        ):
+            time_fit = xr.DataArray(
+                self._time_fit, dims="time", coords={"time": self._time_fit}
+            )
+            time_reconstruct = time_fit.sel(time=t).values
+            if self._hankel_d > 1:
+                if self._time_fit_original is None or t_original is None:
+                    msg = (
+                        "Required time vector information "
+                        "for Hankel post-processing is missing."
+                    )
+                    raise RuntimeError(msg)
+                time_fit_original = xr.DataArray(
+                    self._time_fit_original,
+                    dims="time",
+                    coords={"time": self._time_fit_original},
+                )
+                time_reconstruct_original = time_fit_original.sel(
+                    time=t_original
+                ).values
+        elif (isinstance(t, slice) and check_slice_type(t) == "index") or isinstance(
+            t, int
+        ):
+            time_reconstruct = self._time_fit[t]
+            if self._hankel_d > 1:
+                if self._time_fit_original is None or t_original is None:
+                    msg = (
+                        "Required time vector information "
+                        "for Hankel post-processing is missing."
+                    )
+                    raise RuntimeError(msg)
+                time_reconstruct_original = self._time_fit_original[t_original]
+        elif t is None:
+            time_reconstruct = self._time_fit
+            if self._hankel_d > 1:
+                if self._time_fit_original is None:
+                    msg = (
+                        "Required time vector information "
+                        "for Hankel post-processing is missing."
+                    )
+                    raise RuntimeError(msg)
+                time_reconstruct_original = self._time_fit_original
+        else:
+            msg = "Parameter 't' must be a slice, an integer, a string or None."
+            logger.exception(msg)
+            raise ValueError(msg)
+        _, ind, _ = np.intersect1d(
+            self._time_fit, time_reconstruct, return_indices=True
+        )
+        t_reconstruct = self._t_fit[ind]
+
+        if self._hankel_d > 1:
+            return t_reconstruct, time_reconstruct_original, lags
+        return t_reconstruct, time_reconstruct, lags
+
     def reconstruct(
         self,
         t: slice | int | str | None = None,
@@ -1144,112 +1266,11 @@ class OptDMD:
             msg = "The OptDMD model must be fitted before reconstructing."
             logger.exception(msg)
             raise RuntimeError(msg)
-        if self._time_fit is None or self._t_fit is None:
-            msg = "The OptDMD fit time vector is not available."
-            raise RuntimeError(msg)
 
-        def normalize_datetime_string(s: slice | str) -> slice | str:
-            """Reformat datetime strings to contain second-level precision."""
-            if isinstance(s, slice):
-                start = np.datetime64(s.start, "s").astype(str) if s.start else None
-                stop = np.datetime64(s.stop, "s").astype(str)
-                return slice(start, stop)
-            return np.datetime64(s, "s").astype(str)
-
-        def check_slice_type(t: slice) -> str:
-            """Check if the slice is index or label based."""
-            if (isinstance(t.start, int) or t.start is None) and isinstance(
-                t.stop, int
-            ):
-                return "index"
-            if (isinstance(t.start, str) or t.start is None) and isinstance(
-                t.stop, str
-            ):
-                return "label"
-            msg = "Slice must contain time coordinate indices or labels."
-            logger.exception(msg)
-            raise ValueError(msg)
-
-        # if the requested time span is labelled based, reformat it to second-level
-        # precision
-        if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
-            t, str
-        ):
-            t = normalize_datetime_string(t)
-
-        # convert the requested time span in the original time vector frame of
-        # reference to the corresponding span in the Hankel time vector, and
-        # obtain the associated lag indices of the Hankel pre-processed matrix
-        lags: tuple[int, int] | tuple[int] | None = None
-        t_original: slice | int | str | None = None
-        if self._hankel_d > 1:
-            t_original = t
-            if isinstance(t, slice):
-                t_start, lag_start = (
-                    self._extract_hankel_time(t.start) if t.start else (None, 0)
-                )
-                t_stop, lag_stop = self._extract_hankel_time(t.stop)
-                t = slice(t_start, t_stop)
-                lags = (lag_start, lag_stop) if lag_start != lag_stop else (lag_start,)
-            elif t is not None:
-                t, lag_single = self._extract_hankel_time(t)
-                lags = (lag_single,)
-
-        # now, compute the reconstruction time vector so that we can compute
-        # the prediction
         try:
-            if (isinstance(t, slice) and check_slice_type(t) == "label") or isinstance(
-                t, str
-            ):
-                time_fit = xr.DataArray(
-                    self._time_fit, dims="time", coords={"time": self._time_fit}
-                )
-                time_reconstruct = time_fit.sel(time=t).values
-                if self._hankel_d > 1:
-                    if self._time_fit_original is None or t_original is None:
-                        msg = (
-                            "Required time vector information "
-                            "for Hankel post-processing is missing."
-                        )
-                        raise RuntimeError(msg)
-                    time_fit_original = xr.DataArray(
-                        self._time_fit_original,
-                        dims="time",
-                        coords={"time": self._time_fit_original},
-                    )
-                    time_reconstruct_original = time_fit_original.sel(
-                        time=t_original
-                    ).values
-            elif (
-                isinstance(t, slice) and check_slice_type(t) == "index"
-            ) or isinstance(t, int):
-                time_reconstruct = self._time_fit[t]
-                if self._hankel_d > 1:
-                    if self._time_fit_original is None or t_original is None:
-                        msg = (
-                            "Required time vector information "
-                            "for Hankel post-processing is missing."
-                        )
-                        raise RuntimeError(msg)
-                    time_reconstruct_original = self._time_fit_original[t_original]
-            elif t is None:
-                time_reconstruct = self._time_fit
-                if self._hankel_d > 1:
-                    if self._time_fit_original is None:
-                        msg = (
-                            "Required time vector information "
-                            "for Hankel post-processing is missing."
-                        )
-                        raise RuntimeError(msg)
-                    time_reconstruct_original = self._time_fit_original
-            else:
-                msg = "Parameter 't' must be a slice, an integer, a string or None."
-                logger.exception(msg)
-                raise ValueError(msg)
-            _, ind, _ = np.intersect1d(
-                self._time_fit, time_reconstruct, return_indices=True
+            t_reconstruct, time_reconstruct, lags = (
+                self._generate_reconstruct_time_vector(t)
             )
-            t_reconstruct = self._t_fit[ind]
         except Exception as e:
             msg = "Error trying to generate the reconstruction time vector."
             logger.exception(msg)
@@ -1284,7 +1305,6 @@ class OptDMD:
                     reconstruction,
                     lags,
                 )
-                time_reconstruct = time_reconstruct_original
             except Exception as e:
                 msg = "Error extracting the reconstuction from the Hankel matrix."
                 logger.exception(msg)
