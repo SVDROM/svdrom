@@ -1,4 +1,19 @@
 {
   "projectName": "svdrom",
-  "projectOwner": "SVDROM"
+  "projectOwner": "SVDROM",
+  "repoType": "github",
+  "commitConvention": "angular",
+  "contributors": [
+    {
+      "login": "robertvava",
+      "name": "Robert Vava",
+      "avatar_url": "https://avatars.githubusercontent.com/u/77018483?v=4",
+      "profile": "https://github.com/robertvava",
+      "contributions": [
+        "review",
+        "maintenance",
+        "code"
+      ]
+    }
+  ]
 }
