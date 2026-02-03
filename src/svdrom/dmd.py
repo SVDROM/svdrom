@@ -1204,8 +1204,12 @@ class OptDMD:
         t_reconstruct = self._t_fit[ind]
 
         if self._hankel_d > 1:
-            return t_reconstruct, time_reconstruct_original, lags
-        return t_reconstruct, time_reconstruct, lags
+            return (
+                np.atleast_1d(t_reconstruct),
+                np.atleast_1d(time_reconstruct_original),
+                lags,
+            )
+        return np.atleast_1d(t_reconstruct), np.atleast_1d(time_reconstruct), lags
 
     def reconstruct(
         self,
