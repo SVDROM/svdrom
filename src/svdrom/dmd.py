@@ -706,7 +706,7 @@ class OptDMD:
         else:
             modes = self._modes
         coords = {k: v for k, v in modes.coords.items() if k != "components"}
-        coords[self._time_dimension] = time_prediction
+        coords[self._time_dimension] = time_prediction.squeeze()
         if isinstance(prediction, (np.ndarray | da.Array)):
             return xr.DataArray(
                 prediction, dims=dims, coords=coords, name="dmd_prediction"
