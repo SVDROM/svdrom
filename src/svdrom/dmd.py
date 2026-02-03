@@ -1095,7 +1095,6 @@ class OptDMD:
         and the corresponding lag indices of the Hankel matrix (if
         Hankel pre-processing has been performed).
         """
-        # TODO: add unit tests for this helper method
         if self._time_fit is None or self._t_fit is None:
             msg = "The OptDMD fit time vector is not available."
             raise RuntimeError(msg)
