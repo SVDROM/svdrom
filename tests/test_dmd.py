@@ -475,6 +475,32 @@ class BaseTestOptDMD:
                 ),
             )
 
+    @pytest.mark.parametrize("t", [slice(10), 10])
+    def test_generate_reconstruct_time_vector(self, t):
+        """Test for the generate_reconstruct_time_vector()
+        private method.
+        """
+        solver = self.optdmd
+        t_reconstruct, time_reconstruct, _ = solver._generate_reconstruct_time_vector(t)
+        expected_t_reconstruct = np.atleast_1d(solver._t_fit[t])
+        if not self.hankel_preprocessing:
+            expected_time_reconstruct = np.atleast_1d(solver._time_fit[t])
+        else:
+            expected_time_reconstruct = np.atleast_1d(solver._time_fit_original[t])
+            if isinstance(t, slice):
+                expected_t_reconstruct = expected_t_reconstruct[: -self.d + 1]
+            else:
+                expected_t_reconstruct = solver._t_fit[t - self.d + 1]
+            expected_t_reconstruct = np.atleast_1d(expected_t_reconstruct)
+        assert np.array_equal(t_reconstruct, expected_t_reconstruct), (
+            f"Expected t_reconstruct to be {expected_t_reconstruct}, "
+            f"but got {t_reconstruct} instead."
+        )
+        assert np.array_equal(time_reconstruct, expected_time_reconstruct), (
+            f"Expected time_reconstruct to be {expected_time_reconstruct}, "
+            f"but got {time_reconstruct} instead."
+        )
+
     @pytest.mark.parametrize("t", [slice(5), slice(5, 10), 10])
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_reconstruct(self, solver, t):
