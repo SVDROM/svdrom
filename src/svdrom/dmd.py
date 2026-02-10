@@ -713,7 +713,7 @@ class OptDMD:
         else:
             modes = self._modes
         coords = {k: v for k, v in modes.coords.items() if k != "components"}
-        coords[self._time_dimension] = time_prediction
+        coords[self._time_dimension] = time_prediction.squeeze()
         if isinstance(prediction, (np.ndarray | da.Array)):
             return xr.DataArray(
                 prediction, dims=dims, coords=coords, name="dmd_prediction"
@@ -1114,7 +1114,6 @@ class OptDMD:
         and the corresponding lag indices of the Hankel matrix (if
         Hankel pre-processing has been performed).
         """
-        # TODO: add unit tests for this helper method
         if self._time_fit is None or self._t_fit is None:
             msg = "The OptDMD fit time vector is not available."
             raise RuntimeError(msg)
@@ -1223,8 +1222,12 @@ class OptDMD:
         t_reconstruct = self._t_fit[ind]
 
         if self._hankel_d > 1:
-            return t_reconstruct, time_reconstruct_original, lags
-        return t_reconstruct, time_reconstruct, lags
+            return (
+                np.atleast_1d(t_reconstruct),
+                np.atleast_1d(time_reconstruct_original),
+                lags,
+            )
+        return np.atleast_1d(t_reconstruct), np.atleast_1d(time_reconstruct), lags
 
     def reconstruct(
         self,
