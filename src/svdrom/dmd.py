@@ -344,6 +344,8 @@ class OptDMD:
                     "right singular vectors (v) to contain a "
                     f"{config.get('hankel_time_mapping_attr')} attribute."
                 )
+                logger.exception(msg)
+                raise ValueError(msg)
 
     def _get_time_conversion_factor(self, from_units: str, to_units: str) -> float:
         """Get the time conversion factor from one unit of time to another.
