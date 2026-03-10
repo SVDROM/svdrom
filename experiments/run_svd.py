@@ -23,6 +23,7 @@ if __name__ == "__main__":
     n_oversamples = 15
 
     client = Client(processes=False, local_directory=dask_spill_folder)
+    print(f"Dask dashboard: {client.dashboard_link}")
 
     X = xr.open_dataarray(era5_slice_path, chunks="auto")
     X = X.sel(time=slice("2010", "2019"))
