@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     config.set(stack_coord_name="space")
     X = variable_spatial_stack(X, dims=("latitude", "longitude"))
-    X = X.transpose(("space", "time"))
+    X = X.transpose("space", "time")
 
     print("Computing SVD of standard matrix...")
     svd = TruncatedSVD(
