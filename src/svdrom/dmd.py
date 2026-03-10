@@ -265,6 +265,12 @@ class OptDMD:
         into hankel_d equal parts and average together, eliminating the
         coordinate of Hankel lags.
         """
+        if modes.values.shape[0] % hankel_d != 0:
+            msg = (
+                f"The number of rows ({modes.values.shape[0]}) in the matrix of modes "
+                f"must be divisible by the hankel rank ({hankel_d})."
+            )
+            raise ValueError(msg)
         modes_averaged = modes.values
         modes_averaged = np.average(
             modes_averaged.reshape(
