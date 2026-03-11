@@ -934,8 +934,14 @@ class OptDMD:
                 raise ValueError(msg) from e
             return first_snapshot[0].astype(str), first_snapshot[1]
         if t < 0:
-            if abs(t) > len(self._hankel_time_mapping) - self._hankel_d + 1:
-                msg = "Negative index is out of bounds. Try using a positive index."
+            n_accessible = len(self._hankel_time_mapping) - self._hankel_d + 1
+            if abs(t) > n_accessible:
+                msg = (
+                    f"Negative index {t} is out of bounds. With Hankel rank "
+                    f"{self._hankel_d} and {len(self._hankel_time_mapping)} original "
+                    f"snapshots, valid negative indices are -{n_accessible} to -1. "
+                    "Consider using a positive index instead."
+                )
                 logger.exception(msg)
                 raise ValueError(msg)
             return t, self._hankel_d - 1
