@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from typing import Any
 
 import dask.array as da
 import numpy as np
@@ -204,7 +203,7 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         raise ValueError(msg)
 
     dims = X.dims
-    samples: Any = np.tile(X[dims[0]].to_numpy(), d)
+    samples: np.ndarray | pd.MultiIndex = np.tile(X[dims[0]].to_numpy(), d)
     if isinstance(X.indexes[dims[0]], pd.MultiIndex):
         samples = pd.MultiIndex.from_tuples(
             samples,
