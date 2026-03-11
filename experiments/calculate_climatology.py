@@ -3,8 +3,7 @@ from pathlib import Path
 
 import xarray as xr
 from dask.distributed import Client
-
-from ..demos.utils import compute_climatology
+from utils import compute_climatology
 
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 
