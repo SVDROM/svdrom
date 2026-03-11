@@ -210,13 +210,17 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
             names=X.indexes[dims[0]].names,
         )
 
-    # map each original snapshot to the first time-delay
-    # embedded snapshot in which it appears and to the
-    # corresponding lag index
+    # map each original snapshot to the first Hankel matrix
+    # snapshot in which it appears, and to the corresponding
+    # lag index.
+    # - for very early snapshots (i < d): they first appear at
+    # hankel_time[0] and lag=i
+    # - for later snapshots (i >= d): they first appear at
+    # hankel_time[i - d + 1] and lag=d-1
     original_time = X[dims[1]].values
     hankel_time_mapping = {}
     for i, time in enumerate(original_time):
-        if i - d < 0:
+        if i < d:
             hankel_time_mapping[time] = (original_time[0], i)
         else:
             hankel_time_mapping[time] = (original_time[i - d + 1], d - 1)
