@@ -850,9 +850,10 @@ class OptDMD:
             If lag_start equals lag_end, then pass lags as a single-element
             tuple (lag,). If None, all lags are extracted. Default is None.
         rechunk: bool
-            Whether to rechunk the input array into column blocks
-            of n rows, where n is the length of a single snapshot (i.e.
-            the portion of a Hankel matrix column with the same lag index).
+            Whether to rechunk the input array into blocks of n rows,
+            where n is the length of a single snapshot (i.e. the
+            portion of a Hankel matrix column with the same lag index).
+            This should improve performance when extracting snapshots.
             Default is True.
 
         Returns
@@ -867,7 +868,7 @@ class OptDMD:
         n = prediction.shape[0] // hankel_d
         t = prediction.shape[1]
         if rechunk and isinstance(prediction, da.Array):
-            prediction = prediction.rechunk({0: n, 1: 1})
+            prediction = prediction.rechunk({0: n})  # keep existing column chunks
         snapshots = prediction[:, 0].reshape(hankel_d, -1).T
         if lags is not None:
             if len(lags) == 1:
