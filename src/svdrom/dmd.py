@@ -265,6 +265,12 @@ class OptDMD:
         into hankel_d equal parts and average together, eliminating the
         coordinate of Hankel lags.
         """
+        if modes.values.shape[0] % hankel_d != 0:
+            msg = (
+                f"The number of rows ({modes.values.shape[0]}) in the matrix of modes "
+                f"must be divisible by the hankel rank ({hankel_d})."
+            )
+            raise ValueError(msg)
         modes_averaged = modes.values
         modes_averaged = np.average(
             modes_averaged.reshape(
@@ -338,6 +344,8 @@ class OptDMD:
                     "right singular vectors (v) to contain a "
                     f"{config.get('hankel_time_mapping_attr')} attribute."
                 )
+                logger.exception(msg)
+                raise ValueError(msg)
 
     def _get_time_conversion_factor(self, from_units: str, to_units: str) -> float:
         """Get the time conversion factor from one unit of time to another.
@@ -842,9 +850,10 @@ class OptDMD:
             If lag_start equals lag_end, then pass lags as a single-element
             tuple (lag,). If None, all lags are extracted. Default is None.
         rechunk: bool
-            Whether to rechunk the input array into column blocks
-            of n rows, where n is the length of a single snapshot (i.e.
-            the portion of a Hankel matrix column with the same lag index).
+            Whether to rechunk the input array into blocks of n rows,
+            where n is the length of a single snapshot (i.e. the
+            portion of a Hankel matrix column with the same lag index).
+            This should improve performance when extracting snapshots.
             Default is True.
 
         Returns
@@ -859,7 +868,7 @@ class OptDMD:
         n = prediction.shape[0] // hankel_d
         t = prediction.shape[1]
         if rechunk and isinstance(prediction, da.Array):
-            prediction = prediction.rechunk({0: n, 1: 1})
+            prediction = prediction.rechunk({0: n})  # keep existing column chunks
         snapshots = prediction[:, 0].reshape(hankel_d, -1).T
         if lags is not None:
             if len(lags) == 1:
@@ -925,8 +934,14 @@ class OptDMD:
                 raise ValueError(msg) from e
             return first_snapshot[0].astype(str), first_snapshot[1]
         if t < 0:
-            if abs(t) > len(self._hankel_time_mapping) - self._hankel_d + 1:
-                msg = "Negative index is out of bounds. Try using a positive index."
+            n_accessible = len(self._hankel_time_mapping) - self._hankel_d + 1
+            if abs(t) > n_accessible:
+                msg = (
+                    f"Negative index {t} is out of bounds. With Hankel rank "
+                    f"{self._hankel_d} and {len(self._hankel_time_mapping)} original "
+                    f"snapshots, valid negative indices are -{n_accessible} to -1. "
+                    "Consider using a positive index instead."
+                )
                 logger.exception(msg)
                 raise ValueError(msg)
             return t, self._hankel_d - 1
