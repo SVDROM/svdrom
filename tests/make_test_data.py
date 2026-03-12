@@ -255,7 +255,7 @@ class SignalGenerator:
         self.da = xr.DataArray.from_dict(data)
         return self
 
-    def _generate_signal(
+    def generate_signal(
         self, noise_std: float = 0.2, random_seed: int | None = None
     ) -> "SignalGenerator":
         """Generate signal with three superimposed sinusoids and
@@ -296,7 +296,7 @@ class SignalGenerator:
             (i.e. with one time lag). The default is True.
         """
         if not self.components:
-            self._generate_signal(noise_std=noise_std, random_seed=random_seed)
+            self.generate_signal(noise_std=noise_std, random_seed=random_seed)
         if apply_delay_embedding:
             self._apply_delay_embedding()
         n_components = (

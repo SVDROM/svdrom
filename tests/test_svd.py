@@ -3,7 +3,13 @@ import numpy as np
 import pytest
 import xarray as xr
 
+import svdrom.config as config
+from svdrom.preprocessing import hankel_preprocessing
 from svdrom.svd import TruncatedSVD
+
+samples_coord_name = "samples"
+time_coord_name = "time"
+hankel_coord_name = config.get("hankel_coord_name")
 
 
 def make_dataarray(matrix_type: str) -> xr.DataArray:
@@ -40,7 +46,10 @@ def make_dataarray(matrix_type: str) -> xr.DataArray:
             "Must be one of: tall-and-skinny, short-and-fat, square."
         )
         raise ValueError(msg)
-    coords = {"samples": np.arange(n_samples), "time": np.arange(n_features)}
+    coords = {
+        samples_coord_name: np.arange(n_samples),
+        time_coord_name: np.arange(n_features),
+    }
     dims = list(coords.keys())
     return xr.DataArray(X, dims=dims, coords=coords)
 
@@ -210,5 +219,48 @@ def test_reconstruct_snapshot(matrix_type):
         tsvd.u.shape[0],
     ), f"Reconstructed snapshot should have shape ({tsvd.u.shape[0]}), got {X_r.shape}."
     assert (
-        "samples" in X_r.dims
-    ), "Reconstructed snapshot should have dimension 'samples'."
+        samples_coord_name in X_r.dims
+    ), f"Reconstructed snapshot should have dimension {samples_coord_name}."
+
+
+def test_svd_hankel():
+    """Test that SVD can be performed on a matrix after
+    Hankel pre-processing."""
+    X = make_dataarray("tall-and-skinny")
+    d = 2
+    X_d = hankel_preprocessing(X, d=d)
+    n_components = 10
+    tsvd = TruncatedSVD(n_components=n_components)
+    tsvd.fit(X_d)
+
+    assert tsvd.u.shape == (X_d.shape[0], n_components), (
+        "Expected the shape of the left singular vectors to be "
+        f"{(X_d.shape[0], n_components)}, but got {tsvd.u.shape}."
+    )
+    assert tsvd.v.shape == (n_components, X_d.shape[1]), (
+        "Expected the shape of the right singular vectors to be "
+        f"{(n_components, X_d.shape[1])}, but got {tsvd.v.shape}."
+    )
+    assert len(tsvd.s) == n_components, (
+        "Expected the length of the singular values to be "
+        f"{n_components}, but got {len(tsvd.s)}."
+    )
+    assert hankel_coord_name in tsvd.u.coords, (
+        "Expected the left singular vectors DataArray to contain "
+        f"a coordinate called {hankel_coord_name}."
+    )
+    assert np.array_equal(
+        tsvd.u[hankel_coord_name].values,
+        X_d[hankel_coord_name].values,
+    ), (
+        f"Expected the {hankel_coord_name} coordinate of the left singular vectors "
+        f"to match the {hankel_coord_name} coordinate of the Hankel-preprocessed "
+        "data matrix."
+    )
+    assert (
+        tsvd.v.attrs[config.get("hankel_time_mapping_attr")]
+        == X_d.attrs[config.get("hankel_time_mapping_attr")]
+    ), (
+        f"The {config.get('hankel_time_mapping_attr')} attribute in the right "
+        "singular vectors and Hankel-preprocessed data matrix should match."
+    )
