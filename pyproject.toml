@@ -31,7 +31,7 @@ dependencies = [
   "zarr<=3.1.0",
   "dask[complete]",
   "xarray[complete]",
-  "pydmd @ git+https://github.com/ClimeTrend/PyDMD.git@parallel-bagging",
+  "pydmd @ git+https://github.com/PyDMD/PyDMD.git",
 ]
 
 [project.optional-dependencies]
