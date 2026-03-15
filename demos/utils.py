@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 from dask.diagnostics import ProgressBar
 
@@ -144,7 +145,8 @@ def compute_climatology(
     months: list[int],
 ) -> xr.DataArray:
     """Given observed data, compute a climatological forecast over
-    the specified year and months.
+    the specified year and months. Note 29 Feb is skipped on leap
+    years.
 
     Examples
     --------
@@ -158,23 +160,33 @@ def compute_climatology(
         )
     """
     months = sorted(months)
-    climatology = data.sel(time=data.time.dt.month.isin(months))
-    climatology = climatology.compute()
-    climatology = climatology.sel(
-        time=~((climatology.time.dt.month == 2) & (climatology.time.dt.day == 29))
-    )  # drop 29th Feb for consistency
-    climatology = climatology.groupby(["time.dayofyear", "time.hour"]).mean()
-    hours = climatology.hour.values
-    days = climatology.dayofyear.values
-    t = []
-    for d in days:
-        for h in hours:
-            dt = timedelta(days=int(d - 1), hours=int(h))
-            t.append(np.timedelta64(dt, "h"))
-    t = np.array(t)
-    month = months[0]
-    month = f"0{month}" if month < 10 else str(month)
-    t = np.datetime64(f"{year}-{month}-01T00:00") + t
-    climatology = climatology.stack(time=("dayofyear", "hour"))
-    climatology = climatology.drop_vars(["time", "dayofyear", "hour"])
-    return climatology.assign_coords(time=t)
+
+    dt = (np.unique(np.diff(data.time.values))).astype("timedelta64[h]").astype(int)
+    if len(dt) > 1:
+        msg = "The time axis of the input data must have uniform spacing."
+        raise ValueError(msg)
+    dt = dt[0]
+    times = pd.date_range(
+        f"{year}-01-01", f"{year}-12-31 23:00", freq=timedelta(hours=int(dt))
+    )
+    times = times[times.month.isin(months)]
+    # drop 29 Feb for consistency
+    times = times[~((times.month == 2) & (times.day == 29))]
+
+    # handle 29 Feb on leap years
+    doy = data.time.dt.dayofyear
+    shift = data.time.dt.is_leap_year & (data.time.dt.month > 2)
+    doy_corrected = xr.where(shift, doy - 1, doy)
+    data = data.assign_coords(doy=("time", doy_corrected.data))
+    data = data.sel(time=~((data.time.dt.month == 2) & (data.time.dt.day == 29)))
+
+    # keep only the requested months
+    data = data.sel(time=data.time.dt.month.isin(months))
+    data = data.compute()
+
+    # now group by day of year and hour of day, and average
+    # to compute climatology
+    clim = data.groupby(["doy", "time.hour"]).mean()
+    clim = clim.stack(time=("doy", "hour"))
+    clim = clim.drop_vars(["doy", "hour"])
+    return clim.assign_coords(time=times)
