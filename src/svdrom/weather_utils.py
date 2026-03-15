@@ -30,7 +30,7 @@ def compute_rmse(
     dims: str | tuple[str], optional
         Dimensions along which to average the RMSE. The default is
         ("latitude", "longitude"), which would return the RMSE as a function
-        of prediction time (assuming a single variable and pressure level).
+        of prediction time (assuming a single pressure level).
 
     Returns
     -------
@@ -40,11 +40,24 @@ def compute_rmse(
     Notes
     -----
     If the inputs are dask-backed DataArrays, the function will build the
-    task graph and trigger the computation at the end. You might want to
-    set up a multi-threading Dask cluster before calling the function.
+    task graph lazily, which you can then execute. You should set up
+    a multi-threading Dask cluster before calling the function.
+
+    Examples
+    --------
+    Given dask-backed DataArrays for ground truth and prediction, compute the
+    RMSE averaged over latitude and longitude:
+    >>> from dask.distributed import Client
+    >>> client = Client(processes=False)  # set up a multi-threading Dask cluster
+    >>> rmse = compute_rmse(ground_truth, prediction)
+    >>> # trigger computation and materialize as numpy-backed DataArray
+    >>> rmse = rmse.compute()
     """
     if set(ground_truth.dims) != set(prediction.dims):
-        msg = "The dimensions of the ground truth data and " "prediction don't match."
+        msg = "The dimensions of the ground truth data and prediction don't match."
+        raise ValueError(msg)
+    if "latitude" not in ground_truth.dims:
+        msg = "Expected the input data to have a dimension named latitude."
         raise ValueError(msg)
     prediction = prediction.real  # keep only real part of the prediction
     rmse = ground_truth.copy(data=(ground_truth - prediction) ** 2)
@@ -59,8 +72,7 @@ def compute_rmse(
         rmse *= lat_weights
     rmse = rmse.mean(dim=dims)
     rmse = rmse.clip(min=0)
-    rmse = xr.ufuncs.sqrt(rmse)
-    return rmse.compute()
+    return xr.ufuncs.sqrt(rmse)
 
 
 def compute_climatology(
