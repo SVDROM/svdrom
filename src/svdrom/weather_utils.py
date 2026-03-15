@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 
@@ -58,3 +61,97 @@ def compute_rmse(
     rmse = rmse.clip(min=0)
     rmse = xr.ufuncs.sqrt(rmse)
     return rmse.compute()
+
+
+def compute_climatology(
+    data: xr.DataArray,
+    year: int,
+    months: list[int],
+) -> xr.DataArray:
+    """Given observed data, compute a climatological forecast over
+    the specified year and months.
+
+    Parameters
+    ----------
+    data: xr.DataArray
+        A dask- or numpy-backed DataArray containing the observed data.
+        The data must have a time dimension with uniform spacing, and
+        the time coordinate must be parseable by Pandas.
+    year: int
+        The year for which to compute the climatology. The year is only
+        used to construct the time vector for the climatological forecast,
+        and does not affect the actual values of the climatology.
+    months: list[int]
+        The months for which to compute the climatology. Each month should
+        be an integer from 1 to 12. For example, if months=[1, 2], then
+        the climatological forecast will be computed for January and February
+        of the specified year.
+
+    Returns
+    -------
+    xr.DataArray:
+        A numpy- or dask-backed DataArray containing the calculated climatology,
+        with the time coordinate corresponding to the specified year and months.
+
+    Notes
+    -----
+    If the input data is dask-backed, it is recommended to set up a multi-threading
+    Dask cluster before calling the function.
+
+    Examples
+    --------
+    Given observed data for 2016-2019, compute the climatological forecast for
+    Jan and Feb 2020:
+
+    >>> from dask.distributed import Client
+    >>> client = Client(processes=False)  # set up a multi-threading Dask cluster
+    >>> climatology = compute_climatology(
+            ground_truth.sel(time=slice("2016-01-01", "2019-12-31")),
+            year=2020,
+            months=[1, 2],
+        )
+    >>> climatology = climatology.compute()  # trigger the computation of the task graph
+    >>> client.close()
+    """
+    if "time" not in data.dims:
+        msg = "Expected the input data to have a dimension named time."
+        raise ValueError(msg)
+
+    months = sorted(months)
+
+    # construct the time vector for climatology
+    dt = (np.unique(np.diff(data.time.values))).astype("timedelta64[h]").astype(int)
+    if len(dt) > 1:
+        msg = "The time axis of the input data must have uniform spacing."
+        raise ValueError(msg)
+    dt = dt[0]
+    times = pd.date_range(
+        f"{year}-01-01", f"{year}-12-31 23:00", freq=timedelta(hours=int(dt))
+    )
+    times = times[times.month.isin(months)]
+    # drop 29 Feb on leap years
+    times = times[~((times.month == 2) & (times.day == 29))]
+
+    # handle 29 Feb on leap years on the data, so that
+    # every year has exactly 365 days. Here we assign a new coordinate
+    # for dayofyear (doy), which is attached to the time dimension. doy
+    # is later used to compute the climatology.
+    doy = data.time.dt.dayofyear
+    # from Mar onwards on leap years, shift 'doy' forward by 1 day
+    shift = data.time.dt.is_leap_year & (data.time.dt.month > 2)
+    doy_corrected = xr.where(shift, doy - 1, doy)
+    data = data.assign_coords(doy=("time", doy_corrected.data))
+    # now drop 29 Feb
+    data = data.sel(time=~((data.time.dt.month == 2) & (data.time.dt.day == 29)))
+
+    # keep only the requested months
+    data = data.sel(time=data.time.dt.month.isin(months))
+
+    # group by the  day of year and hour of day to compute climatology
+    # note: specifying Numpy engine for multi-key groupby to avoid concurrent
+    # access error when using Numba (the default engine)
+    clima = data.groupby(["doy", "time.hour"]).mean(engine="numpy")
+    clima = clima.stack(time=("doy", "hour"))
+    clima = clima.drop_vars(["doy", "hour"])
+
+    return clima.assign_coords(time=times)
