@@ -43,6 +43,7 @@ dev = [
 extras = [
   "cartopy >= 0.24.1",
   "gcsfs",
+  "weatherbench2 @ git+https://github.com/google-research/weatherbench2.git",
 ]
 
 [project.urls]
@@ -82,7 +83,7 @@ disallow_incomplete_defs = false
 check_untyped_defs = true
 strict = false
 [[tool.mypy.overrides]]
-module = ["pydmd.*"]
+module = ["pydmd.*", "weatherbench2.*"]
 follow_untyped_imports = true
 
 [tool.ruff]

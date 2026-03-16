@@ -3,6 +3,10 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 import xarray as xr
+from weatherbench2.derived_variables import (
+    ZonalEnergySpectrum,
+    interpolate_spectral_frequencies,
+)
 
 
 def compute_rmse(
@@ -167,3 +171,73 @@ def compute_climatology(
     clima = clima.drop_vars(["doy", "hour"])
 
     return clima.assign_coords(time=times)
+
+
+def compute_energy_spectrum(
+    data: xr.DataArray,
+    lat_range: tuple[int, int] | None = (30, 60),
+) -> xr.DataArray:
+    """Compute the zonal energy spectrum along lines of constant
+    latitude as a function of wavenumber (unitless), frequency (1/m)
+    and wavelength (m).
+    The spectrum is computed using Weatherbench2.
+
+    Parameters
+    ----------
+    data: xr.DataArray
+        The variable on a lat/lon grid for which to compute the energy spectrum.
+        The DataArray must be backed by a Numpy array.
+    lat_range: tuple[int, int] | None, optional
+        Latitude range over which to perform an average of the energy spectrum.
+        The default is (30, 60), meaning that the output energy spectrum is the
+        average for 30deg < |lat| < 60deg. If lat_range is None, no averaging is
+        performed, and the output energy spectrum is given as a function of
+        wavenumber instead of frequency.
+
+    Returns
+    -------
+    xr.DataArray:
+        A Numpy-backed DataArray containing the computed zonal energy spectrum.
+        If lat_range is None, the spectrum is returned as a function of latitude
+        and wavenumber (unitless). If lat_range is a tuple, the spectrum is returned
+        as a function of frequency (1/m), where the frequency corresponds to the
+        most narrow range of frequencies found in lat_range. To perform the average,
+        latitudes closer to the Equator are given a larger weight than latitudes
+        closer to the poles.
+
+    Notes
+    -----
+    The input DataArray must not be backed by a Dask array, so make sure you select
+    a relatively small slice and load it onto memory.
+
+    Example
+    -------
+    >>> era5 = xr.open_dataset("era5_slice.zarr", chunks="auto", engine="zarr")
+    >>> temperature = era5["temperature"]
+    >>> temperature = temperature.sel(time="2020-01-01")
+    >>> temperature.load()
+    >>> spectrum = compute_energy_spectrum(temperature)
+    """
+    if not isinstance(data.data, np.ndarray):
+        msg = (
+            "The input DataArray must be backed by a Numpy array. "
+            "Load the data into memory before calling the function."
+        )
+        raise ValueError(msg)
+
+    ds = data.to_dataset(name="variable")
+    var_name = str(next(iter(ds.data_vars)))
+    spectrum = ZonalEnergySpectrum(var_name).compute(ds)
+
+    if lat_range:
+        lat = spectrum.latitude
+        lat_mask = (np.abs(lat) >= lat_range[0]) & (np.abs(lat) <= lat_range[1])
+        spectrum = spectrum.sel(latitude=lat_mask)
+
+        spectrum = interpolate_spectral_frequencies(
+            spectrum, wavenumber_dim="zonal_wavenumber"
+        )
+        weights = np.cos(np.deg2rad(spectrum.latitude))
+        spectrum = spectrum.weighted(weights).mean("latitude")
+
+    return spectrum
