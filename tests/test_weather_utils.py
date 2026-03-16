@@ -1,21 +1,35 @@
+import numpy as np
+import pandas as pd
 import pytest
+import xarray as xr
 from make_test_data import DataGenerator
 
 from svdrom.weather_utils import compute_rmse
 
 
-@pytest.mark.parametrize(
-    "dims",
-    [
-        ("time",),
-        ("latitude", "longitude", "level"),
-        ("latitude", "longitude", "level", "time"),
-    ],
-)
-def test_compute_rmse(dims):
-    """Test for the compute_rmse() weather utility function."""
-    prediction_generator = DataGenerator(vars=["temperature"], seed=1234)
-    groundtruth_generator = DataGenerator(vars=["temperature"], seed=1235)
+@pytest.fixture()
+def data_generator() -> tuple[xr.DataArray, xr.DataArray]:
+    """Generate a prediction and groundtruth DataArrays for testing."""
+    time = (pd.date_range("2018-01-01T00", "2019-12-31T00", freq="1D")).to_numpy()
+    x = np.arange(-90, 91, 1)
+    y = np.arange(0, 361, 1)
+    z = np.array([850])
+    prediction_generator = DataGenerator(
+        x=x,
+        y=y,
+        z=z,
+        t=time,
+        vars=["temperature"],
+        seed=1234,
+    )
+    groundtruth_generator = DataGenerator(
+        x=x,
+        y=y,
+        z=z,
+        t=time,
+        vars=["temperature"],
+        seed=1235,
+    )
 
     prediction_generator.generate_dataarray()
     prediction = prediction_generator.da
@@ -26,6 +40,20 @@ def test_compute_rmse(dims):
     prediction = prediction.rename(rename_dict)
     groundtruth = groundtruth.rename(rename_dict)
 
+    return prediction, groundtruth
+
+
+@pytest.mark.parametrize(
+    "dims",
+    [
+        ("time",),
+        ("latitude", "longitude", "level"),
+        ("latitude", "longitude", "level", "time"),
+    ],
+)
+def test_compute_rmse(dims, data_generator):
+    """Test for the compute_rmse() weather utility function."""
+    prediction, groundtruth = data_generator
     rmse = compute_rmse(groundtruth, prediction, dims=dims)
 
     match dims:
