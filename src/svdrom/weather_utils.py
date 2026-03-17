@@ -66,14 +66,8 @@ def compute_rmse(
     prediction = prediction.real  # keep only real part of the prediction
     rmse = ground_truth.copy(data=(ground_truth - prediction) ** 2)
     if lat_weighting:
-        lat_weights_np = np.cos(np.deg2rad(ground_truth.latitude.values))
-        lat_weights_np = lat_weights_np / np.mean(lat_weights_np)
-        lat_weights_dict = {}
-        lat_weights_dict["data"] = lat_weights_np
-        lat_weights_dict["dims"] = "latitude"
-        lat_weights_dict["latitude"] = {"data": rmse.latitude, "dims": ("latitude")}
-        lat_weights = xr.DataArray.from_dict(lat_weights_dict)
-        rmse *= lat_weights
+        lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
+        rmse = rmse.weighted(lat_weights)
     rmse = rmse.mean(dim=dims)
     rmse = rmse.clip(min=0)
     return xr.ufuncs.sqrt(rmse)
