@@ -1,3 +1,4 @@
+import logging
 import pickle
 from pathlib import Path
 
@@ -12,35 +13,41 @@ from svdrom.preprocessing import (
 )
 from svdrom.svd import TruncatedSVD
 
+logging.basicConfig(format="%(message)s", level=logging.INFO)
+
 if __name__ == "__main__":
+    start_date = "2010-07-01"
+    end_date = "2020-06-30"
+    subfolder = start_date + "_" + end_date
     dask_spill_folder = "/bask/projects/v/vjgo8416-dmd-ddwm/dask-spill"
-    era5_slice_path = "data/era5_slice_2010-01-01_2022-12-31.zarr"
-    svd_path = Path("data/svd.pkl")
-    svd_hankel_path = Path("data/svd_hankel.pkl")
-    scaler_path = Path("data/scaler.pkl")
+    base_path = Path("data")
+    era5_slice_path = base_path / "era5_slice_2010-01-01_2022-12-31.zarr"
+    svd_path = base_path / subfolder / "svd.pkl"
+    svd_hankel_path = base_path / subfolder / "svd_hankel.pkl"
+    scaler_path = base_path / subfolder / "scaler.pkl"
     n_components = 40
     n_power_iter = 2
     n_oversamples = 15
 
     client = Client(processes=False, local_directory=dask_spill_folder)
-    print(f"Dask dashboard: {client.dashboard_link}")
+    logging.info("Dask dashboard: %s", client.dashboard_link)
 
     X = xr.open_dataarray(era5_slice_path, chunks="auto")
-    X = X.sel(time=slice("2010", "2019"))
+    X = X.sel(time=slice(start_date, end_date))
 
-    print("Scaling data...")
+    logging.info("Scaling data...")
     scaler = StandardScaler()
     X = scaler(X)
     scaler_path.parent.mkdir(exist_ok=True)
     with open(scaler_path, "wb") as f:
         pickle.dump(scaler, f)
-    print("Scaler object saved to disk.")
+    logging.info("Scaler object saved to disk.")
 
     config.set(stack_coord_name="space")
     X = variable_spatial_stack(X, dims=("latitude", "longitude"))
     X = X.transpose("space", "time")
 
-    print("Computing SVD of standard matrix...")
+    logging.info("Computing SVD of standard matrix...")
     svd = TruncatedSVD(
         n_components=n_components,
         algorithm="randomized",
@@ -51,11 +58,11 @@ if __name__ == "__main__":
     svd_path.parent.mkdir(exist_ok=True)
     with open(svd_path, "wb") as f:
         pickle.dump(svd, f)
-    print("SVD object saved to disk.")
+    logging.info("SVD object saved to disk.")
 
     X_hankel = hankel_preprocessing(X)
 
-    print("Computing SVD of Hankel pre-processed matrix...")
+    logging.info("Computing SVD of Hankel pre-processed matrix...")
     svd_hankel = TruncatedSVD(
         n_components=n_components,
         algorithm="randomized",
@@ -66,6 +73,6 @@ if __name__ == "__main__":
     svd_hankel_path.parent.mkdir(exist_ok=True)
     with open(svd_hankel_path, "wb") as f:
         pickle.dump(svd_hankel, f)
-    print("Hankel SVD object saved to disk.")
+    logging.info("Hankel SVD object saved to disk.")
 
     client.close()
