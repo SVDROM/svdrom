@@ -54,7 +54,7 @@ def data_generator() -> tuple[xr.DataArray, xr.DataArray]:
 def test_compute_rmse(dims, data_generator):
     """Test for the compute_rmse() weather utility function."""
     prediction, groundtruth = data_generator
-    rmse = compute_rmse(groundtruth, prediction, dims=dims)
+    rmse = compute_rmse(groundtruth, prediction, dims=dims, lat_weighting=False)
 
     match dims:
         case ("time",):
@@ -67,4 +67,9 @@ def test_compute_rmse(dims, data_generator):
             msg = "Unexpected value for dims: {dims}"
             raise ValueError(msg)
 
+    expected_rmse = (prediction - groundtruth) ** 2  # square
+    expected_rmse = expected_rmse.mean(dims)  # mean
+    expected_rmse = xr.ufuncs.sqrt(expected_rmse)  # root
+
+    xr.testing.assert_allclose(rmse, expected_rmse)
     assert set(rmse.dims) == set(expected_out_dims)
