@@ -10,9 +10,9 @@ from svdrom.weather_utils import compute_rmse
 @pytest.fixture()
 def data_generator() -> tuple[xr.DataArray, xr.DataArray]:
     """Generate a prediction and groundtruth DataArrays for testing."""
-    time = (pd.date_range("2018-01-01T00", "2019-12-31T00", freq="1D")).to_numpy()
-    x = np.arange(-90, 91, 1)
-    y = np.arange(0, 361, 1)
+    time = (pd.date_range("2017-01-01T00", "2019-12-31T00", freq="1D")).to_numpy()
+    x = np.arange(-90, 91, 2)
+    y = np.arange(0, 361, 2)
     z = np.array([850])
     prediction_generator = DataGenerator(
         x=x,
