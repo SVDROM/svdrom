@@ -59,6 +59,7 @@ xfail_strict = true
 filterwarnings = [
   "error",
   "ignore::UserWarning:pydmd",
+  "ignore::PendingDeprecationWarning:weatherbench2",
 ]
 log_cli_level = "INFO"
 testpaths = [
