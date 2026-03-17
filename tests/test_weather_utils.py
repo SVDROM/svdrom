@@ -4,7 +4,11 @@ import pytest
 import xarray as xr
 from make_test_data import DataGenerator
 
-from svdrom.weather_utils import compute_climatology, compute_rmse
+from svdrom.weather_utils import (
+    compute_climatology,
+    compute_energy_spectrum,
+    compute_rmse,
+)
 
 
 @pytest.fixture()
@@ -109,3 +113,18 @@ def test_compute_climatology(year, months, data_generator):
     assert np.array_equal(
         climatology.time.values, expected_date_range
     ), "Climatology does not have the expected time vector."
+
+
+def test_compute_energy_spectrum(data_generator):
+    """Test for the compute_energy_spectrum() function."""
+    prediction, _ = data_generator
+    spectrum = compute_energy_spectrum(prediction)
+    expected_dims = ("time", "frequency", "level")
+
+    assert set(spectrum.dims) == set(expected_dims), (
+        f"Expected dimensions of spectrum to be {expected_dims}, "
+        f"but got {spectrum.dims}."
+    )
+    assert (
+        "wavelength" in spectrum.coords
+    ), "Expected wavelength to be a coordinate of spectrum."
