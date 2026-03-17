@@ -162,7 +162,7 @@ def compute_climatology(
     # access error when using Numba (the default engine)
     clima = data.groupby(["doy", "time.hour"]).mean(engine="numpy")
     clima = clima.stack(time=("doy", "hour"))
-    clima = clima.drop_vars(["doy", "hour"])
+    clima = clima.drop_vars(["time", "doy", "hour"])
 
     return clima.assign_coords(time=times)
 
