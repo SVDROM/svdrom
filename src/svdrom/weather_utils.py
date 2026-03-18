@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 import numpy as np
+import pandas as pd
 import xarray as xr
 from weatherbench2.derived_variables import (
     ZonalEnergySpectrum,
@@ -140,6 +143,49 @@ def compute_climatology(
     # note: specifying Numpy engine for multi-key groupby to avoid concurrent
     # access error when using Numba (the default engine)
     return data.groupby(["dayofyear", "time.hour"]).mean(engine="numpy")
+
+
+def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArray:
+    """Given climatology as a function of day of year and hour of day (such as the
+    one returned by compute_climatology()), convert the dayofyear and hour dimensions
+    into a single time dimension.
+
+    Parameters
+    ----------
+    climatology: xr.DataArray
+        Climatology as a function of day of year and hour of day. It must contain
+        dimensions "dayofyear" and "hour".
+
+    year: int
+        The year that will be used to construct the new time dimension.
+
+    Returns
+    -------
+    xr.DataArray:
+        The climatology with the dayofyear and hour dimensions converted into a
+        single time dimension. The output DataArray is numpy-backed.
+
+    Notes
+    -----
+    If the input DataArray is dask-backed, the function will trigger the computation
+    of the underlying task graph and load the data into memory, so be mindful about
+    the size of the input DataArray.
+    """
+    if "dayofyear" not in climatology.dims or "hour" not in climatology.dims:
+        msg = (
+            "The input climatology is expected to have dimensions "
+            "'dayofyear' and 'hour'."
+        )
+        raise ValueError(msg)
+    climatology = climatology.compute()
+    delta_hours = np.unique(np.diff(climatology.hour.values))[0]
+    times = pd.date_range(
+        f"{year}-01-01", f"{year}-12-31 23:00", freq=timedelta(hours=int(delta_hours))
+    )
+    times = times[times.dayofyear.isin(climatology.dayofyear.values)]
+    climatology = climatology.stack(time=("dayofyear", "hour"))
+    climatology = climatology.drop_vars(["time", "dayofyear", "hour"])
+    return climatology.assign_coords(time=times)
 
 
 def compute_energy_spectrum(
