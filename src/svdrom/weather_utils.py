@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -150,11 +148,11 @@ def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArra
         )
         raise ValueError(msg)
     climatology = climatology.compute()
-    delta_hours = np.unique(np.diff(climatology.hour.values))[0]
-    times = pd.date_range(
-        f"{year}-01-01", f"{year}-12-31 23:00", freq=timedelta(hours=int(delta_hours))
-    )
-    times = times[times.dayofyear.isin(climatology.dayofyear.values)]
+    times = pd.date_range(f"{year}-01-01", f"{year}-12-31 23:00", freq="1h")
+    times = times[
+        times.dayofyear.isin(climatology.dayofyear.values)
+        & times.hour.isin(climatology.hour.values)
+    ]
     climatology = climatology.stack(time=("dayofyear", "hour"))
     climatology = climatology.drop_vars(["time", "dayofyear", "hour"])
     return climatology.assign_coords(time=times)
