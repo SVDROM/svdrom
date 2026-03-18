@@ -79,40 +79,51 @@ def test_compute_rmse(dims, data_generator):
     assert set(rmse.dims) == set(expected_out_dims)
 
 
-@pytest.mark.parametrize("year", [2020, 2021, 2022, 2023])
-@pytest.mark.parametrize("months", [[1, 2, 3], [7, 8, 9]])
-def test_compute_climatology(year, months, data_generator):
+@pytest.mark.parametrize("months", [[1, 2], [7, 8], None])
+def test_compute_climatology(months, data_generator):
     """Test for the compute_climatology() function."""
     _, groundtruth = data_generator
-    freq = np.unique(np.diff(groundtruth.time))[0]
-    climatology = compute_climatology(groundtruth, year, months)
+    climatology = compute_climatology(groundtruth, months)
 
     match months:
-        case [1, 2, 3]:
-            expected_date_range = pd.date_range(
-                f"{year}-01-01T00", f"{year}-03-31T00", freq=pd.Timedelta(freq)
+        case [1, 2]:
+            days_in_jan, days_in_feb = 31, 28
+            expected_doy = np.arange(1, days_in_jan + days_in_feb + 1)
+        case [7, 8]:
+            days_in_jan, days_in_feb, days_in_mar = 31, 28, 31
+            days_in_apr, days_in_may, days_in_jun = 30, 31, 30
+            days_till_jul = days_in_jan + days_in_feb + days_in_mar
+            days_till_jul += days_in_apr + days_in_may + days_in_jun
+            days_in_jul, days_in_aug = 31, 31
+            expected_doy = np.arange(
+                days_till_jul + 1, days_till_jul + days_in_jul + days_in_aug + 1
             )
-        case [7, 8, 9]:
-            expected_date_range = pd.date_range(
-                f"{year}-07-01T00", f"{year}-09-30T00", freq=pd.Timedelta(freq)
-            )
+        case None:
+            days_in_year = 365
+            expected_doy = np.arange(1, days_in_year + 1)
         case _:
             msg = f"Unexpected value for months: {months}"
             raise ValueError(msg)
 
-    # on leap years, climatology should not contain 29 Feb
-    date_to_drop = pd.Timestamp("2020-02-29").date()
-    mask = expected_date_range.date != date_to_drop
-    expected_date_range = expected_date_range[mask]
-    expected_date_range = expected_date_range.to_numpy()
-
-    assert set(climatology.dims) == set(groundtruth.dims), (
-        "Climatology should have the same dimensions as the dataset "
-        "used to compute it."
+    freq = (
+        (np.unique(np.diff(groundtruth.time))[0]).astype("timedelta64[h]").astype("int")
     )
-    assert np.array_equal(
-        climatology.time.values, expected_date_range
-    ), "Climatology does not have the expected time vector."
+    hours_in_day = 24
+    expected_hour = np.arange(0, hours_in_day, step=freq)
+
+    expected_dims = {"latitude", "longitude", "level", "dayofyear", "hour"}
+    assert set(climatology.dims) == expected_dims, (
+        f"Climatology should have dimensions: {tuple(expected_dims)}, "
+        f"but got {tuple(climatology.dims)}."
+    )
+    assert np.array_equal(climatology.dayofyear.values, expected_doy), (
+        f"Expected doyofyear dimension to be {expected_doy}, "
+        f"but got {climatology.dayofyear.values}."
+    )
+    assert np.array_equal(climatology.hour, expected_hour), (
+        f"Expected doyofyear dimension to be {expected_hour}, "
+        f"but got {climatology.hour.values}."
+    )
 
 
 def test_compute_energy_spectrum(data_generator):
