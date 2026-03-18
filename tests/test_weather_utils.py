@@ -8,6 +8,7 @@ from svdrom.weather_utils import (
     compute_climatology,
     compute_energy_spectrum,
     compute_rmse,
+    expand_time_climatology,
 )
 
 
@@ -79,6 +80,7 @@ def test_compute_rmse(dims, data_generator):
     assert set(rmse.dims) == set(expected_out_dims)
 
 
+@pytest.mark.dependency()
 def test_compute_climatology(data_generator):
     """Test for the compute_climatology() function."""
     _, groundtruth = data_generator
@@ -106,6 +108,28 @@ def test_compute_climatology(data_generator):
     assert np.array_equal(climatology.hour, expected_hour), (
         f"Expected doyofyear dimension to be {expected_hour}, "
         f"but got {climatology.hour.values}."
+    )
+
+
+@pytest.mark.dependency(depends=["test_compute_climatology"])
+@pytest.mark.parametrize("doy", [slice(1, 60), slice(180, 240)])
+@pytest.mark.parametrize("year", [2020, 2021, 2023, 2024])
+def test_expand_time_climatology(doy, year, data_generator):
+    """Test for the expand_time_climatology() function."""
+    _, groundtruth = data_generator
+    climatology = compute_climatology(groundtruth)
+    climatology = climatology.sel(dayofyear=doy)
+    hours = climatology.hour.values
+    climatology = expand_time_climatology(climatology, year)
+
+    expected_time = pd.date_range(f"{year}-01-01", f"{year}-12-31 23:00", freq="1h")
+    expected_time = expected_time[
+        expected_time.dayofyear.isin(range(doy.start, doy.stop + 1))
+        & expected_time.hour.isin(hours)
+    ]
+    assert np.array_equal(climatology.time.values, expected_time), (
+        f"Expected time vector to be: {expected_time}, "
+        f"but instead got: {climatology.time.values}."
     )
 
 
