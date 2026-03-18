@@ -75,7 +75,6 @@ def compute_rmse(
 
 def compute_climatology(
     data: xr.DataArray,
-    months: list[int] | None = None,
 ) -> xr.DataArray:
     """Given observed data, compute the climatology as a function
     of day of year and hour of day.
@@ -84,20 +83,12 @@ def compute_climatology(
     ----------
     data: xr.DataArray
         A dask- or numpy-backed DataArray containing the observed data.
-    months: list[int] | None, optional
-        The months for which to compute the climatology. Each month should
-        be an integer from 1 to 12. For example, if months=[1, 2], then
-        the climatology will be computed for January and February. If months
-        is None, climatology is calculated for the whole year. The default is
-        None.
 
     Returns
     -------
     xr.DataArray:
         A numpy- or dask-backed DataArray containing the calculated climatology,
-        as a function of day of year and hour of day. In this implementation,
-        the returned climatology has at most 365 days. Leap years are handled by
-        dropping the 29th of Feb.
+        as a function of day of year and hour of day.
 
     Notes
     -----
@@ -106,14 +97,13 @@ def compute_climatology(
 
     Examples
     --------
-    Given observed data for 2016-2019, compute the climatology for Jan and Feb:
+    Given observed data for 2016-2019, compute the climatology:
 
     >>> from dask.distributed import Client
     >>> client = Client(processes=False)  # set up a multi-threading Dask cluster
-    >>> climatology = compute_climatology(
-            ground_truth.sel(time=slice("2016-01-01", "2019-12-31")),
-            months=[1, 2],
-        )
+    >>> climatology = compute_climatology(era5)
+    >>> # say you were only interested in the first 60 days of the year:
+    >>> climatology = climatology.sel(dayofyear=slice(1, 60))
     >>> climatology = climatology.compute()  # trigger the computation of the task graph
     >>> client.close()
     """
@@ -121,28 +111,10 @@ def compute_climatology(
         msg = "Expected the input data to have a dimension named time."
         raise ValueError(msg)
 
-    months = sorted(months) if months else None
-
-    # handle 29 Feb on leap years on the data, so that
-    # every year has exactly 365 days. Here we assign a new coordinate
-    # for dayofyear, which is attached to the time dimension. dayofyear
-    # is then used to compute the climatology.
-    doy = data.time.dt.dayofyear
-    # from Mar onwards on leap years, shift 'doy' forward by 1 day
-    shift = data.time.dt.is_leap_year & (data.time.dt.month > 2)
-    doy_corrected = xr.where(shift, doy - 1, doy)
-    data = data.assign_coords(dayofyear=("time", doy_corrected.data))
-    # now drop 29 Feb
-    data = data.sel(time=~((data.time.dt.month == 2) & (data.time.dt.day == 29)))
-
-    # keep only the requested months
-    if months:
-        data = data.sel(time=data.time.dt.month.isin(months))
-
     # group by the  day of year and hour of day to compute climatology
     # note: specifying Numpy engine for multi-key groupby to avoid concurrent
     # access error when using Numba (the default engine)
-    return data.groupby(["dayofyear", "time.hour"]).mean(engine="numpy")
+    return data.groupby(["time.dayofyear", "time.hour"]).mean(engine="numpy")
 
 
 def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArray:

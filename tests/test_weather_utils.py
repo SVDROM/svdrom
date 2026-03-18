@@ -79,31 +79,14 @@ def test_compute_rmse(dims, data_generator):
     assert set(rmse.dims) == set(expected_out_dims)
 
 
-@pytest.mark.parametrize("months", [[1, 2], [7, 8], None])
-def test_compute_climatology(months, data_generator):
+def test_compute_climatology(data_generator):
     """Test for the compute_climatology() function."""
     _, groundtruth = data_generator
-    climatology = compute_climatology(groundtruth, months)
+    climatology = compute_climatology(groundtruth)
 
-    match months:
-        case [1, 2]:
-            days_in_jan, days_in_feb = 31, 28
-            expected_doy = np.arange(1, days_in_jan + days_in_feb + 1)
-        case [7, 8]:
-            days_in_jan, days_in_feb, days_in_mar = 31, 28, 31
-            days_in_apr, days_in_may, days_in_jun = 30, 31, 30
-            days_till_jul = days_in_jan + days_in_feb + days_in_mar
-            days_till_jul += days_in_apr + days_in_may + days_in_jun
-            days_in_jul, days_in_aug = 31, 31
-            expected_doy = np.arange(
-                days_till_jul + 1, days_till_jul + days_in_jul + days_in_aug + 1
-            )
-        case None:
-            days_in_year = 365
-            expected_doy = np.arange(1, days_in_year + 1)
-        case _:
-            msg = f"Unexpected value for months: {months}"
-            raise ValueError(msg)
+    time_series = pd.Series(groundtruth.time.values)
+    contains_leap_year = time_series.dt.is_leap_year.any()
+    expected_doy = np.arange(1, 367) if contains_leap_year else np.arange(1, 366)
 
     freq = (
         (np.unique(np.diff(groundtruth.time))[0]).astype("timedelta64[h]").astype("int")
