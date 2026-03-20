@@ -29,7 +29,7 @@ if __name__ == "__main__":
     logging.info("Rechunking...")
     climatology = climatology.chunk(
         {
-            "dayofyear": "auto",
+            "dayofyear": 3,
             "hour": -1,
             "latitude": -1,
             "longitude": -1,
