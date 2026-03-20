@@ -14,6 +14,6 @@ source ../load_python.sh
 
 source ../.venv/bin/activate
 echo $(which python)
-uv pip install ../.
+uv pip install "../.[extras]"
 
 python calculate_climatology.py
