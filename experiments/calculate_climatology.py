@@ -3,23 +3,27 @@ from pathlib import Path
 
 import xarray as xr
 from dask.distributed import Client
-from utils import compute_climatology
+
+from svdrom.weather_utils import compute_climatology
 
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 if __name__ == "__main__":
+    start_year = 2010
+    end_year = 2019
     dask_spill_folder = "/bask/projects/v/vjgo8416-dmd-ddwm/dask-spill"
-    era5_slice_path = "data/era5_slice_2010-01-01_2022-12-31.zarr"
-    climatology_path = Path("data/climatology_JanFeb2020.zarr")
+    base_path = Path("data")
+    era5_slice_path = base_path / "era5_slice_2010-01-01_2022-12-31.zarr"
+    climatology_path = base_path / f"climatology_{start_year}-{end_year}.zarr"
 
     client = Client(processes=False, local_directory=dask_spill_folder)
     logging.info("Dask dashboard: %s", client.dashboard_link)
 
     X = xr.open_dataarray(era5_slice_path, chunks="auto")
-    X = X.sel(time=slice("2010", "2019"))
+    X = X.sel(time=slice(start_year, end_year))
 
-    logging.info("Computing climatology...")
-    climatology = compute_climatology(X, year=2020, months=[1, 2])
+    logging.info("Calculating climatology...")
+    climatology = compute_climatology(X)
     logging.info("Done.")
 
     logging.info("Saving to disk...")
