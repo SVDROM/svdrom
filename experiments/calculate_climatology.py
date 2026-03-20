@@ -26,6 +26,18 @@ if __name__ == "__main__":
     climatology = compute_climatology(X)
     logging.info("Done.")
 
+    logging.info("Rechunking...")
+    climatology = climatology.chunk(
+        {
+            "dayofyear": "auto",
+            "hour": -1,
+            "latitude": -1,
+            "longitude": -1,
+        }
+    )
+    logging.info("Done.")
+    logging.info("Dask blocks: %s = %s", climatology.dims, climatology.data.numblocks)
+
     logging.info("Saving to disk...")
     climatology_path.parent.mkdir(exist_ok=True)
     climatology.to_zarr(
