@@ -31,18 +31,20 @@ dependencies = [
   "zarr<=3.1.0",
   "dask[complete]",
   "xarray[complete]",
-  "pydmd @ git+https://github.com/ClimeTrend/PyDMD.git@parallel-bagging",
+  "pydmd @ git+https://github.com/PyDMD/PyDMD.git",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest >=6",
   "pytest-cov >=3",
+  "pytest-dependency",
   "pre-commit",
 ]
 extras = [
   "cartopy >= 0.24.1",
   "gcsfs",
+  "weatherbench2 @ git+https://github.com/google-research/weatherbench2.git",
 ]
 
 [project.urls]
@@ -58,6 +60,7 @@ xfail_strict = true
 filterwarnings = [
   "error",
   "ignore::UserWarning:pydmd",
+  "ignore::PendingDeprecationWarning:weatherbench2",
 ]
 log_cli_level = "INFO"
 testpaths = [
@@ -82,7 +85,7 @@ disallow_incomplete_defs = false
 check_untyped_defs = true
 strict = false
 [[tool.mypy.overrides]]
-module = ["pydmd.*"]
+module = ["pydmd.*", "weatherbench2.*"]
 follow_untyped_imports = true
 
 [tool.ruff]

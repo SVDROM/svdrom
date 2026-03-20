@@ -45,11 +45,13 @@ class DataGenerator:
         vars: list | None = None,
         seed: int | None = 1234,
     ):
-        self.x = x if x else np.arange(0, 10)
-        self.y = y if y else np.arange(0, 10)
-        self.z = z if z else np.arange(0, 5)
+        self.x = x if x is not None else np.arange(0, 10)
+        self.y = y if y is not None else np.arange(0, 10)
+        self.z = z if z is not None else np.arange(0, 5)
         self.t = (
-            t if t else np.arange(0, 20, dtype="datetime64[s]").astype("datetime64[ns]")
+            t
+            if t is not None
+            else np.arange(0, 20, dtype="datetime64[s]").astype("datetime64[ns]")
         )
         self.vars = vars if vars else ["U", "V", "W"]
         self.rng = np.random.default_rng(seed)
