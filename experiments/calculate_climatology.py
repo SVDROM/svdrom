@@ -20,7 +20,7 @@ if __name__ == "__main__":
     logging.info("Dask dashboard: %s", client.dashboard_link)
 
     X = xr.open_dataarray(era5_slice_path, chunks="auto")
-    X = X.sel(time=slice(start_year, end_year))
+    X = X.sel(time=slice(str(start_year), str(end_year)))
 
     logging.info("Calculating climatology...")
     climatology = compute_climatology(X)
