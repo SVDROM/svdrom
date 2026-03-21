@@ -99,7 +99,9 @@ def compute_climatology(
     Notes
     -----
     If the input data is dask-backed, it is recommended to set up a multi-threading
-    Dask cluster before calling the function.
+    Dask cluster before calling the function. Note that performing the smoothing via
+    the rolling weighted average is considerably more expensive and a large amount of
+    disk spillage from Dask is expected.
 
     Examples
     --------
