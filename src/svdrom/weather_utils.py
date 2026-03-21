@@ -73,14 +73,22 @@ def compute_rmse(
 
 def compute_climatology(
     data: xr.DataArray,
+    smooth_window: int | None = 61,
 ) -> xr.DataArray:
     """Given observed data, compute the climatology as a function
-    of day of year and hour of day.
+    of day of year (doy) and hour of day.
 
     Parameters
     ----------
     data: xr.DataArray
         A dask- or numpy-backed DataArray containing the observed data.
+    smooth_window: int | None
+        The size (in days) of a sliding window around each doy-hour combination
+        with weights linearly decaying to zero from the center, used to compute
+        a rolling weighted mean. This removes sample noise and results in a
+        smoother climatology. It should be an odd number. If you don't want to
+        perform this weighted average, set to None. The default is 61, same as
+        in Weatherbench2.
 
     Returns
     -------
@@ -91,7 +99,9 @@ def compute_climatology(
     Notes
     -----
     If the input data is dask-backed, it is recommended to set up a multi-threading
-    Dask cluster before calling the function.
+    Dask cluster before calling the function. Note that performing the smoothing via
+    the rolling weighted average is considerably more expensive and a large amount of
+    disk spillage from Dask is expected.
 
     Examples
     --------
@@ -112,7 +122,43 @@ def compute_climatology(
     # group by the  day of year and hour of day to compute climatology
     # note: specifying Numpy engine for multi-key groupby to avoid concurrent
     # access error when using Numba (the default engine)
-    return data.groupby(["time.dayofyear", "time.hour"]).mean(engine="numpy")
+    raw_clim = data.groupby(["time.dayofyear", "time.hour"]).mean(engine="numpy")
+
+    if not smooth_window:
+        return raw_clim
+
+    half = smooth_window // 2
+    n_days = raw_clim.sizes["dayofyear"]
+
+    # circular padding: last `half` days prepended, first `half` days appended
+    padded = xr.concat(
+        [
+            raw_clim.isel(dayofyear=slice(-half, None)),
+            raw_clim,
+            raw_clim.isel(dayofyear=slice(None, half)),
+        ],
+        dim="dayofyear",
+    ).assign_coords(dayofyear=np.arange(1, 1 + n_days + 2 * half))
+
+    # triangular weights: center gets weight 1.0, edges (+half and -half days)
+    # get 1/(half+1)
+    weights = xr.DataArray(
+        np.maximum(0.0, 1.0 - np.abs(np.arange(-half, half + 1)) / (half + 1)),
+        dims=["window"],
+    )
+
+    # now we apply a rolling weighted mean along the window dimension,
+    smooth_clim = (
+        padded.rolling(dayofyear=smooth_window, center=True)
+        .construct("window")
+        .isel(dayofyear=slice(half, half + n_days))  # strip padding
+        .weighted(weights)
+        .mean("window")
+        .astype(raw_clim.dtype)  # return to original precision
+    )
+
+    # restore original coords
+    return smooth_clim.assign_coords(dayofyear=raw_clim.dayofyear.values)
 
 
 def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArray:

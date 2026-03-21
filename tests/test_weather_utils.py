@@ -16,8 +16,8 @@ from svdrom.weather_utils import (
 def data_generator() -> tuple[xr.DataArray, xr.DataArray]:
     """Generate a prediction and groundtruth DataArrays for testing."""
     time = (pd.date_range("2016-01-01T00", "2019-12-31T00", freq="1D")).to_numpy()
-    x = np.arange(-90, 91, 2)
-    y = np.arange(0, 361, 2)
+    x = np.arange(-90, 91, 4)
+    y = np.arange(0, 361, 4)
     z = np.array([850])
     prediction_generator = DataGenerator(
         x=x,
@@ -80,11 +80,17 @@ def test_compute_rmse(dims, data_generator):
     assert set(rmse.dims) == set(expected_out_dims)
 
 
-@pytest.mark.dependency()
-def test_compute_climatology(data_generator):
+@pytest.mark.parametrize(
+    "smooth_window",
+    [
+        pytest.param(None, marks=pytest.mark.dependency(name="clima_None")),
+        pytest.param(61, marks=pytest.mark.dependency(name="clima_int")),
+    ],
+)
+def test_compute_climatology(smooth_window, data_generator):
     """Test for the compute_climatology() function."""
     _, groundtruth = data_generator
-    climatology = compute_climatology(groundtruth)
+    climatology = compute_climatology(groundtruth, smooth_window)
 
     time_series = pd.Series(groundtruth.time.values)
     contains_leap_year = time_series.dt.is_leap_year.any()
@@ -111,7 +117,7 @@ def test_compute_climatology(data_generator):
     )
 
 
-@pytest.mark.dependency(depends=["test_compute_climatology"])
+@pytest.mark.dependency(depends=["clima_None", "clima_int"])
 @pytest.mark.parametrize("doy", [slice(1, 60), slice(180, 240)])
 @pytest.mark.parametrize("year", [2020, 2021, 2023, 2024])
 def test_expand_time_climatology(doy, year, data_generator):
