@@ -37,12 +37,12 @@ def compute_rmse(
     Returns
     -------
     xr.DataArray:
-        A numpy-backed DataArray containing the calculated RMSE score.
+        A dask- or numpy-backed DataArray containing the calculated RMSE score.
 
     Notes
     -----
     If the inputs are dask-backed DataArrays, the function will build the
-    task graph lazily, which you can then execute. You should set up
+    task graph lazily, which you can then execute manually. You should set up
     a multi-threading Dask cluster before calling the function.
 
     Examples
@@ -63,6 +63,12 @@ def compute_rmse(
         raise ValueError(msg)
     prediction = prediction.real  # keep only real part of the prediction
     rmse = ground_truth.copy(data=(ground_truth - prediction) ** 2)
+    if rmse.size == 0:
+        msg = (
+            "The resulting array is empty. Do the ground truth and prediction "
+            "arrays share coordinates?"
+        )
+        raise ValueError(msg)
     if lat_weighting:
         lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
         rmse = rmse.weighted(lat_weights)
