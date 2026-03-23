@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -6,6 +8,7 @@ from make_test_data import DataGenerator
 
 from svdrom.weather_utils import (
     compute_climatology,
+    compute_crps_gaussian,
     compute_energy_spectrum,
     compute_rmse,
     expand_time_climatology,
@@ -13,39 +16,67 @@ from svdrom.weather_utils import (
 
 
 @pytest.fixture()
-def data_generator() -> tuple[xr.DataArray, xr.DataArray]:
-    """Generate a prediction and groundtruth DataArrays for testing."""
-    time = (pd.date_range("2016-01-01T00", "2019-12-31T00", freq="1D")).to_numpy()
-    x = np.arange(-90, 91, 4)
-    y = np.arange(0, 361, 4)
-    z = np.array([850])
-    prediction_generator = DataGenerator(
-        x=x,
-        y=y,
-        z=z,
-        t=time,
-        vars=["temperature"],
-        seed=1234,
-    )
-    groundtruth_generator = DataGenerator(
-        x=x,
-        y=y,
-        z=z,
-        t=time,
-        vars=["temperature"],
-        seed=1235,
-    )
+def data_generator() -> Callable:
+    """Generate random prediction and groundtruth DataArrays for testing."""
 
-    prediction_generator.generate_dataarray()
-    prediction = prediction_generator.da
-    groundtruth_generator.generate_dataarray()
-    groundtruth = groundtruth_generator.da
+    def _factory(
+        prediction_seed: int = 1234, groundtruth_seed: int = 1235
+    ) -> tuple[xr.DataArray, xr.DataArray]:
+        time = (pd.date_range("2016-01-01T00", "2019-12-31T00", freq="1D")).to_numpy()
+        x = np.arange(-90, 91, 4)
+        y = np.arange(0, 361, 4)
+        z = np.array([850])
 
-    rename_dict = {"x": "latitude", "y": "longitude", "z": "level"}
-    prediction = prediction.rename(rename_dict)
-    groundtruth = groundtruth.rename(rename_dict)
+        prediction_generator = DataGenerator(
+            x=x,
+            y=y,
+            z=z,
+            t=time,
+            vars=["temperature"],
+            seed=prediction_seed,
+        )
+        groundtruth_generator = DataGenerator(
+            x=x,
+            y=y,
+            z=z,
+            t=time,
+            vars=["temperature"],
+            seed=groundtruth_seed,
+        )
 
-    return prediction, groundtruth
+        prediction_generator.generate_dataarray()
+        prediction = prediction_generator.da
+        groundtruth_generator.generate_dataarray()
+        groundtruth = groundtruth_generator.da
+
+        rename_dict = {"x": "latitude", "y": "longitude", "z": "level"}
+        prediction = prediction.rename(rename_dict)
+        groundtruth = groundtruth.rename(rename_dict)
+
+        return prediction, groundtruth
+
+    return _factory
+
+
+@pytest.fixture()
+def probabilistic_prediction_generator(
+    data_generator,
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """Generate an ensemble of random predictions, and return their
+    mean and standard deviation.
+    """
+    predictions = []
+    n_predictions = 10
+
+    for _ in range(n_predictions):
+        prediction, _ = data_generator(prediction_seed=None)
+        predictions.append(prediction)
+
+    predictions = xr.concat(predictions, dim="ensemble")
+    prediction_mean = predictions.mean("ensemble")
+    predictions_std = predictions.std("ensemble")
+
+    return prediction_mean, predictions_std
 
 
 @pytest.mark.parametrize(
@@ -58,7 +89,7 @@ def data_generator() -> tuple[xr.DataArray, xr.DataArray]:
 )
 def test_compute_rmse(dims, data_generator):
     """Test for the compute_rmse() weather utility function."""
-    prediction, groundtruth = data_generator
+    prediction, groundtruth = data_generator()
     rmse = compute_rmse(groundtruth, prediction, dims=dims, lat_weighting=False)
 
     match dims:
@@ -89,7 +120,7 @@ def test_compute_rmse(dims, data_generator):
 )
 def test_compute_climatology(smooth_window, data_generator):
     """Test for the compute_climatology() function."""
-    _, groundtruth = data_generator
+    _, groundtruth = data_generator()
     climatology = compute_climatology(groundtruth, smooth_window)
 
     time_series = pd.Series(groundtruth.time.values)
@@ -122,7 +153,7 @@ def test_compute_climatology(smooth_window, data_generator):
 @pytest.mark.parametrize("year", [2020, 2021, 2023, 2024])
 def test_expand_time_climatology(doy, year, data_generator):
     """Test for the expand_time_climatology() function."""
-    _, groundtruth = data_generator
+    _, groundtruth = data_generator()
     climatology = compute_climatology(groundtruth)
     climatology = climatology.sel(dayofyear=doy)
     hours = climatology.hour.values
@@ -141,7 +172,7 @@ def test_expand_time_climatology(doy, year, data_generator):
 
 def test_compute_energy_spectrum(data_generator):
     """Test for the compute_energy_spectrum() function."""
-    prediction, _ = data_generator
+    prediction, _ = data_generator()
     spectrum = compute_energy_spectrum(prediction)
     expected_dims = ("time", "frequency", "level")
 
@@ -152,3 +183,40 @@ def test_compute_energy_spectrum(data_generator):
     assert (
         "wavelength" in spectrum.coords
     ), "Expected wavelength to be a coordinate of spectrum."
+
+
+@pytest.mark.parametrize("dims", [("latitude", "longitude"), "time", None])
+@pytest.mark.parametrize("lat_weighting", [True, False])
+def test_compute_crps_gaussian(
+    data_generator,
+    probabilistic_prediction_generator,
+    dims,
+    lat_weighting,
+):
+    """Test for the compute_crps_gaussian() function."""
+    _, groundtruth = data_generator()
+    prediction_mean, prediction_std = probabilistic_prediction_generator
+
+    crps = compute_crps_gaussian(
+        groundtruth,
+        prediction_mean,
+        prediction_std,
+        lat_weighting=lat_weighting,
+        dims=dims,
+    )
+
+    match dims:
+        case ("latitude", "longitude"):
+            expected_dims = set(groundtruth.dims) - set(dims)
+        case "time":
+            expected_dims = set(groundtruth.dims) - {"time"}
+        case None:
+            expected_dims = set(groundtruth.dims)
+        case _:
+            msg = f"Unexpected value for dims: {dims}"
+            raise ValueError(msg)
+
+    assert set(crps.dims) == expected_dims, (
+        f"Expected dimensions of CRPS to be {tuple(expected_dims)}, "
+        f"but got {crps.dims} instead."
+    )
