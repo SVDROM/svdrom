@@ -346,10 +346,10 @@ def compute_crps_gaussian(
         join="exact",
     )
 
-    if lat_weighting:
+    if lat_weighting and dims is not None:
         lat_weights = np.cos(np.deg2rad(crps.latitude))
         crps = crps.weighted(lat_weights)
-    if dims:
+    if dims is not None:
         crps = crps.mean(dim=dims)
 
     return crps.clip(min=0)
