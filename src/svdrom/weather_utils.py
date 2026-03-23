@@ -353,3 +353,30 @@ def compute_crps_gaussian(
         crps = crps.mean(dim=dims)
 
     return crps.clip(min=0)
+
+
+def compute_acc(
+    groundtruth: xr.DataArray,
+    prediction: xr.DataArray,
+    climatology: xr.DataArray,
+) -> xr.DataArray:
+    prediction = prediction.real
+
+    obs_anomalies = groundtruth - climatology
+    pred_anomalies = prediction - climatology
+
+    acc = obs_anomalies * pred_anomalies
+    lat_weights = np.cos(np.deg2rad(acc.latitude))
+    acc = acc.weighted(lat_weights).sum(("latitude", "longitude"))
+
+    sum_of_squares_pred = pred_anomalies**2
+    sum_of_squares_pred = sum_of_squares_pred.weighted(lat_weights).sum(
+        ("latitude", "longitude")
+    )
+
+    sum_of_squares_obs = obs_anomalies**2
+    sum_of_squares_obs = sum_of_squares_obs.weighted(lat_weights).sum(
+        ("latitude", "longitude")
+    )
+
+    return acc / np.sqrt(sum_of_squares_obs * sum_of_squares_pred)
