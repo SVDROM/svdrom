@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import properscoring as ps  # type: ignore[import-not-found]
 import xarray as xr
 from weatherbench2.derived_variables import (
     ZonalEnergySpectrum,
@@ -278,3 +279,77 @@ def compute_energy_spectrum(
         spectrum = spectrum.weighted(weights).mean("latitude")
 
     return spectrum
+
+
+def compute_crps_gaussian(
+    ground_truth: xr.DataArray,
+    prediction_mean: xr.DataArray,
+    prediction_std: xr.DataArray,
+    lat_weighting: bool = True,
+    dims: str | tuple[str, ...] | None = ("latitude", "longitude"),
+) -> xr.DataArray:
+    """Compute the Continuous Ranked Probability Score (CRPS) for
+    a probabilistic forecast, assuming a Gaussian distribution.
+
+    Parameters
+    ----------
+    ground_truth: xr.DataArray
+        The ground truth data. Must be a numpy-backed array.
+    prediction_mean: xr.DataArray
+        The mean of the predictions ensemble. Must be a
+        numpy-backed array.
+    prediction_std: xr.DataArray
+        The standard deviation of the predictions ensemble.
+        Must be a numpy-backed array.
+    lat_weights: bool, optional
+        Whether to apply a weighting function so that spatial locations
+        in a lat/lon grid closer to the Equator receive a larger weight
+        than those closer to the poles. Default is True.
+    dims: str | tuple[str] | None, optional
+        Dimensions along which to average the CRPS. The default is
+        ("latitude", "longitude"), which would return the CRPS as a function
+        of prediction time (assuming a single pressure level). Set to None
+        if you don't want to perform averaging.
+
+    Returns
+    -------
+    xr.DataArray:
+        The Continuous Ranked Probability Score as a numpy-backed array.
+
+    Notes
+    -----
+    The function does not currently support dask-backed arrays. All input
+    arrays must be numpy-backed. CRPS is calculated using crps_gaussian() from
+    the properscoring library: https://github.com/properscoring/properscoring
+    """
+
+    for arr in (ground_truth, prediction_mean, prediction_std):
+        if not isinstance(arr.data, np.ndarray):
+            msg = (
+                "The input DataArray must be numpy-backed. "
+                "Call .compute() to materialize it in memory."
+            )
+            raise ValueError(msg)
+
+    if (prediction_std.values <= 0.0).any():
+        msg = (
+            "The prediction standard deviation array must "
+            "only contain positive values."
+        )
+        raise ValueError(msg)
+
+    crps = xr.apply_ufunc(
+        ps.crps_gaussian,
+        ground_truth,
+        prediction_mean,
+        prediction_std,
+        join="exact",
+    )
+
+    if lat_weighting:
+        lat_weights = np.cos(np.deg2rad(crps.latitude))
+        crps = crps.weighted(lat_weights)
+    if dims:
+        crps = crps.mean(dim=dims)
+
+    return crps.clip(min=0)

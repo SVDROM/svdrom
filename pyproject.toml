@@ -45,6 +45,7 @@ extras = [
   "cartopy >= 0.24.1",
   "gcsfs",
   "weatherbench2 @ git+https://github.com/google-research/weatherbench2.git",
+  "properscoring @ git+https://github.com/SVDROM/properscoring.git",
 ]
 
 [project.urls]
