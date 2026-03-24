@@ -356,13 +356,59 @@ def compute_crps_gaussian(
 
 
 def compute_acc(
-    groundtruth: xr.DataArray,
+    ground_truth: xr.DataArray,
     prediction: xr.DataArray,
     climatology: xr.DataArray,
 ) -> xr.DataArray:
+    """Compute the Anomaly Correlation Coefficient (ACC).
+
+    Parameters
+    ----------
+    ground_truth: xr.DataArray
+        The ground truth data. Can be dask-backed or numpy-backed.
+    prediction: xr.DataArray
+        The prediction (a reconstruction or a forecast). Can be dask-backed or
+        numpy-backed. The prediction and ground truth must be defined on the same
+        spatio-temporal grid.
+    climatology: xr.DataArray
+        The climatology, defined as the average of the observed data as a function
+        of day of year and hour of day. However, it must be passed with a time
+        dimension matching the ground_truth and prediction arrays. It must be defined
+        on the same spatio-temporal grid as the ground_truth and prediction. Can be
+        dask-backed or numpy-backed.
+
+    Returns
+    -------
+    xr.DataArray:
+        The Anomaly Correlation Coefficient as a dask- or numpy-backed DataArray,
+        averaged over latitude and longitude and as a function of time (assuming a
+        single pressure level). Latitude weighting is applied so that spatial
+        locations in a lat/lon grid closer to the Equator receive a large weight
+        than those closer to the poles.
+
+    Notes
+    -----
+    If your climatology is defined as a function of day of year and hour of day
+    (such as the one returned by compute_climatology()), you can use the
+    expand_time_climatology() function to convert it into a function of time.
+    """
     prediction = prediction.real
 
-    obs_anomalies = groundtruth - climatology
+    try:
+        # will raise error if not on the same spatio-temporal grid
+        xr.align(ground_truth, prediction, climatology, join="exact")
+    except ValueError as e:
+        msg = (
+            "The input arrays cannot be aligned. Are they defined "
+            "on the same spatio-temporal grid?"
+        )
+        raise ValueError(msg) from e
+
+    if not ({"latitude", "longitude"}).issubset(ground_truth.dims):
+        msg = "The 'latitude' and 'longitude' dimensions are not present."
+        raise ValueError(msg)
+
+    obs_anomalies = ground_truth - climatology
     pred_anomalies = prediction - climatology
 
     acc = obs_anomalies * pred_anomalies
