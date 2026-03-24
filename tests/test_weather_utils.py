@@ -149,21 +149,25 @@ def test_compute_climatology(smooth_window, data_generator):
 
 
 @pytest.mark.dependency(depends=["clima_None", "clima_int"])
-@pytest.mark.parametrize("doy", [slice(1, 60), slice(180, 240)])
+@pytest.mark.parametrize("doy", [slice(1, 60), slice(180, 240), None])
 @pytest.mark.parametrize("year", [2020, 2021, 2023, 2024])
 def test_expand_time_climatology(doy, year, data_generator):
     """Test for the expand_time_climatology() function."""
     _, groundtruth = data_generator()
     climatology = compute_climatology(groundtruth)
-    climatology = climatology.sel(dayofyear=doy)
+    if doy is not None:
+        climatology = climatology.sel(dayofyear=doy)
     hours = climatology.hour.values
     climatology = expand_time_climatology(climatology, year)
 
     expected_time = pd.date_range(f"{year}-01-01", f"{year}-12-31 23:00", freq="1h")
-    expected_time = expected_time[
-        expected_time.dayofyear.isin(range(doy.start, doy.stop + 1))
-        & expected_time.hour.isin(hours)
-    ]
+    if doy is not None:
+        expected_time = expected_time[
+            expected_time.dayofyear.isin(range(doy.start, doy.stop + 1))
+            & expected_time.hour.isin(hours)
+        ]
+    else:
+        expected_time = expected_time[expected_time.hour.isin(hours)]
     assert np.array_equal(climatology.time.values, expected_time), (
         f"Expected time vector to be: {expected_time}, "
         f"but instead got: {climatology.time.values}."

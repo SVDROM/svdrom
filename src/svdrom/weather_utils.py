@@ -206,6 +206,9 @@ def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArra
         times.dayofyear.isin(climatology.dayofyear.values)
         & times.hour.isin(climatology.hour.values)
     ]
+    climatology = climatology.sel(
+        dayofyear=climatology.dayofyear.isin(np.unique(times.dayofyear))
+    )
     climatology = climatology.stack(time=("dayofyear", "hour"))
     climatology = climatology.drop_vars(["time", "dayofyear", "hour"])
     return climatology.assign_coords(time=times)
