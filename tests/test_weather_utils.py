@@ -7,6 +7,7 @@ import xarray as xr
 from make_test_data import DataGenerator
 
 from svdrom.weather_utils import (
+    compute_acc,
     compute_climatology,
     compute_crps_gaussian,
     compute_energy_spectrum,
@@ -111,13 +112,8 @@ def test_compute_rmse(dims, data_generator):
     assert set(rmse.dims) == set(expected_out_dims)
 
 
-@pytest.mark.parametrize(
-    "smooth_window",
-    [
-        pytest.param(None, marks=pytest.mark.dependency(name="clima_None")),
-        pytest.param(61, marks=pytest.mark.dependency(name="clima_int")),
-    ],
-)
+@pytest.mark.dependency(name="compute_clima")
+@pytest.mark.parametrize("smooth_window", [None, 61])
 def test_compute_climatology(smooth_window, data_generator):
     """Test for the compute_climatology() function."""
     _, groundtruth = data_generator()
@@ -148,7 +144,7 @@ def test_compute_climatology(smooth_window, data_generator):
     )
 
 
-@pytest.mark.dependency(depends=["clima_None", "clima_int"])
+@pytest.mark.dependency(depends=["compute_clima"], name="expand_time_clima")
 @pytest.mark.parametrize("doy", [slice(1, 60), slice(180, 240), None])
 @pytest.mark.parametrize("year", [2020, 2021, 2023, 2024])
 def test_expand_time_climatology(doy, year, data_generator):
@@ -223,4 +219,43 @@ def test_compute_crps_gaussian(
     assert set(crps.dims) == expected_dims, (
         f"Expected dimensions of CRPS to be {tuple(expected_dims)}, "
         f"but got {crps.dims} instead."
+    )
+
+
+@pytest.mark.dependency(depends=["compute_clima", "expand_time_clima"])
+def test_compute_acc(data_generator):
+    """Test for the compute_acc() function."""
+    prediction, ground_truth = data_generator()
+    prediction = prediction.sel(time="2019")
+    climatology = compute_climatology(ground_truth.sel(time=slice("2016", "2018")))
+    ground_truth = ground_truth.sel(time="2019")
+    climatology = expand_time_climatology(climatology, year=2019)
+
+    acc = compute_acc(
+        ground_truth=ground_truth,
+        prediction=prediction,
+        climatology=climatology,
+    )
+    acc = acc.squeeze()
+    assert acc.dims == (
+        "time",
+    ), f"Expected dimensions of ACC to be ('time',), but got {acc.dims}."
+    assert (
+        acc.time.values == ground_truth.time.values
+    ).all(), "Expected time coordinates of ACC to match those of ground truth."
+
+    assert np.abs(acc.values.mean()) < 0.05, (
+        "Expected mean ACC to be close to 0 for random predictions, "
+        f"but got {acc.values.mean()}."
+    )
+
+    acc = compute_acc(
+        ground_truth=ground_truth,
+        prediction=ground_truth,
+        climatology=climatology,
+    )
+    acc = acc.squeeze()
+    assert acc.values.mean() > 0.95, (
+        "Expected mean ACC to be close to 1 for perfect predictions, "
+        f"but got {acc.values.mean()}."
     )
