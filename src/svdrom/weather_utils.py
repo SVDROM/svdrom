@@ -341,6 +341,16 @@ def compute_crps_gaussian(
         )
         raise ValueError(msg)
 
+    try:
+        # will raise error if not on the same spatio-temporal grid
+        xr.align(ground_truth, prediction_mean, prediction_std, join="exact")
+    except ValueError as e:
+        msg = (
+            "The input arrays cannot be aligned. Are they defined "
+            "on the same spatio-temporal grid?"
+        )
+        raise ValueError(msg) from e
+
     crps = xr.apply_ufunc(
         ps.crps_gaussian,
         ground_truth,
