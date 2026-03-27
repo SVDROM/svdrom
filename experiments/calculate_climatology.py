@@ -29,14 +29,20 @@ if __name__ == "__main__":
     logging.info("Done.")
 
     logging.info("Rechunking...")
-    climatology = climatology.chunk(
-        {
-            "dayofyear": 3,
-            "hour": -1,
-            "latitude": -1,
-            "longitude": -1,
-        }
-    )
+
+    def _rechunk(arr: xr.DataArray) -> xr.DataArray:
+        return arr.chunk(
+            {
+                "dayofyear": 3,
+                "hour": -1,
+                "latitude": -1,
+                "longitude": -1,
+            }
+        )
+
+    climatology = _rechunk(climatology)
+    climatology_std = _rechunk(climatology_std)
+
     logging.info("Done.")
     logging.info("Dask blocks: %s = %s", climatology.dims, climatology.data.numblocks)
 
