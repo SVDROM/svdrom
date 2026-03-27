@@ -114,34 +114,49 @@ def test_compute_rmse(dims, data_generator):
 
 @pytest.mark.dependency(name="compute_clima")
 @pytest.mark.parametrize("smooth_window", [None, 61])
-def test_compute_climatology(smooth_window, data_generator):
+@pytest.mark.parametrize("probabilistic", [False, True])
+def test_compute_climatology(data_generator, smooth_window, probabilistic):
     """Test for the compute_climatology() function."""
     _, groundtruth = data_generator()
-    climatology = compute_climatology(groundtruth, smooth_window)
 
-    time_series = pd.Series(groundtruth.time.values)
-    contains_leap_year = time_series.dt.is_leap_year.any()
-    expected_doy = np.arange(1, 367) if contains_leap_year else np.arange(1, 366)
+    def _test(arr: xr.DataArray) -> None:
+        time_series = pd.Series(groundtruth.time.values)
+        contains_leap_year = time_series.dt.is_leap_year.any()
+        expected_doy = np.arange(1, 367) if contains_leap_year else np.arange(1, 366)
 
-    freq = (
-        (np.unique(np.diff(groundtruth.time))[0]).astype("timedelta64[h]").astype("int")
-    )
-    hours_in_day = 24
-    expected_hour = np.arange(0, hours_in_day, step=freq)
+        freq = (
+            (np.unique(np.diff(groundtruth.time))[0])
+            .astype("timedelta64[h]")
+            .astype("int")
+        )
+        hours_in_day = 24
+        expected_hour = np.arange(0, hours_in_day, step=freq)
 
-    expected_dims = {"latitude", "longitude", "level", "dayofyear", "hour"}
-    assert set(climatology.dims) == expected_dims, (
-        f"Climatology should have dimensions: {tuple(expected_dims)}, "
-        f"but got {tuple(climatology.dims)}."
-    )
-    assert np.array_equal(climatology.dayofyear.values, expected_doy), (
-        f"Expected doyofyear dimension to be {expected_doy}, "
-        f"but got {climatology.dayofyear.values}."
-    )
-    assert np.array_equal(climatology.hour, expected_hour), (
-        f"Expected doyofyear dimension to be {expected_hour}, "
-        f"but got {climatology.hour.values}."
-    )
+        expected_dims = {"latitude", "longitude", "level", "dayofyear", "hour"}
+        assert set(arr.dims) == expected_dims, (
+            f"Climatology should have dimensions: {tuple(expected_dims)}, "
+            f"but got {tuple(arr.dims)}."
+        )
+        assert np.array_equal(arr.dayofyear.values, expected_doy), (
+            f"Expected doyofyear dimension to be {expected_doy}, "
+            f"but got {arr.dayofyear.values}."
+        )
+        assert np.array_equal(arr.hour, expected_hour), (
+            f"Expected doyofyear dimension to be {expected_hour}, "
+            f"but got {arr.hour.values}."
+        )
+
+    if not probabilistic:
+        climatology = compute_climatology(groundtruth, smooth_window)
+        _test(climatology)
+    else:
+        climatology, climatology_std = compute_climatology(
+            groundtruth,
+            smooth_window,
+            probabilistic=True,
+        )
+        _test(climatology)
+        _test(climatology_std)
 
 
 @pytest.mark.dependency(depends=["compute_clima"], name="expand_time_clima")

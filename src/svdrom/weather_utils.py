@@ -81,7 +81,8 @@ def compute_rmse(
 def compute_climatology(
     data: xr.DataArray,
     smooth_window: int | None = 61,
-) -> xr.DataArray:
+    probabilistic: bool = False,
+) -> xr.DataArray | tuple[xr.DataArray, xr.DataArray]:
     """Given observed data, compute the climatology as a function
     of day of year (doy) and hour of day.
 
@@ -96,12 +97,18 @@ def compute_climatology(
         smoother climatology. It should be an odd number. If you don't want to
         perform this weighted average, set to None. The default is 61, same as
         in Weatherbench2.
+    probabilistic: bool, optional
+        If True, also compute and return the standard deviation of the climatology
+        (i.e. across years, for each day-of-year/hour-of-day group). The same
+        smoothing is applied to the standard deviation as to the mean. Default
+        is False.
 
     Returns
     -------
     xr.DataArray:
         A numpy- or dask-backed DataArray containing the calculated climatology,
-        as a function of day of year and hour of day.
+        as a function of day of year and hour of day. If ``probabilistic=True``,
+        a tuple ``(mean_climatology, std_climatology)`` is returned instead.
 
     Notes
     -----
@@ -129,43 +136,50 @@ def compute_climatology(
     # group by the  day of year and hour of day to compute climatology
     # note: specifying Numpy engine for multi-key groupby to avoid concurrent
     # access error when using Numba (the default engine)
-    raw_clim = data.groupby(["time.dayofyear", "time.hour"]).mean(engine="numpy")
+    grouped = data.groupby(["time.dayofyear", "time.hour"])
+    raw_clim = grouped.mean(engine="numpy")
+    if probabilistic:
+        raw_std = grouped.std(engine="numpy")
 
     if not smooth_window:
-        return raw_clim
+        return (raw_clim, raw_std) if probabilistic else raw_clim
 
-    half = smooth_window // 2
-    n_days = raw_clim.sizes["dayofyear"]
+    def _smooth(raw: xr.DataArray) -> xr.DataArray:
+        half = smooth_window // 2
+        n_days = raw.sizes["dayofyear"]
 
-    # circular padding: last `half` days prepended, first `half` days appended
-    padded = xr.concat(
-        [
-            raw_clim.isel(dayofyear=slice(-half, None)),
-            raw_clim,
-            raw_clim.isel(dayofyear=slice(None, half)),
-        ],
-        dim="dayofyear",
-    ).assign_coords(dayofyear=np.arange(1, 1 + n_days + 2 * half))
+        # circular padding: last `half` days prepended, first `half` days appended
+        padded = xr.concat(
+            [
+                raw.isel(dayofyear=slice(-half, None)),
+                raw,
+                raw.isel(dayofyear=slice(None, half)),
+            ],
+            dim="dayofyear",
+        ).assign_coords(dayofyear=np.arange(1, 1 + n_days + 2 * half))
 
-    # triangular weights: center gets weight 1.0, edges (+half and -half days)
-    # get 1/(half+1)
-    weights = xr.DataArray(
-        np.maximum(0.0, 1.0 - np.abs(np.arange(-half, half + 1)) / (half + 1)),
-        dims=["window"],
-    )
+        # triangular weights: center gets weight 1.0, edges (+half and -half days)
+        # get 1/(half+1)
+        weights = xr.DataArray(
+            np.maximum(0.0, 1.0 - np.abs(np.arange(-half, half + 1)) / (half + 1)),
+            dims=["window"],
+        )
 
-    # now we apply a rolling weighted mean along the window dimension,
-    smooth_clim = (
-        padded.rolling(dayofyear=smooth_window, center=True)
-        .construct("window")
-        .isel(dayofyear=slice(half, half + n_days))  # strip padding
-        .weighted(weights)
-        .mean("window")
-        .astype(raw_clim.dtype)  # return to original precision
-    )
+        smoothed = (
+            padded.rolling(dayofyear=smooth_window, center=True)
+            .construct("window")
+            .isel(dayofyear=slice(half, half + n_days))  # strip padding
+            .weighted(weights)
+            .mean("window")
+            .astype(raw.dtype)  # return to original precision
+        )
+        # restore original coords
+        return smoothed.assign_coords(dayofyear=raw.dayofyear.values)
 
-    # restore original coords
-    return smooth_clim.assign_coords(dayofyear=raw_clim.dayofyear.values)
+    smooth_clim = _smooth(raw_clim)
+    if probabilistic:
+        return smooth_clim, _smooth(raw_std)
+    return smooth_clim
 
 
 def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArray:
