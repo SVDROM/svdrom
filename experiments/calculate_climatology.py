@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import dask
 import xarray as xr
 from dask.distributed import Client
 
@@ -15,6 +16,7 @@ if __name__ == "__main__":
     base_path = Path("data")
     era5_slice_path = base_path / "era5_slice_2010-01-01_2022-12-31.zarr"
     climatology_path = base_path / f"climatology_{start_year}-{end_year}.zarr"
+    climatology_std_path = base_path / f"climatology_std_{start_year}-{end_year}.zarr"
 
     client = Client(processes=False, local_directory=dask_spill_folder)
     logging.info("Dask dashboard: %s", client.dashboard_link)
@@ -23,7 +25,7 @@ if __name__ == "__main__":
     X = X.sel(time=slice(str(start_year), str(end_year)))
 
     logging.info("Calculating climatology...")
-    climatology = compute_climatology(X)
+    climatology, climatology_std = compute_climatology(X, probabilistic=True)
     logging.info("Done.")
 
     logging.info("Rechunking...")
@@ -40,11 +42,20 @@ if __name__ == "__main__":
 
     logging.info("Saving to disk...")
     climatology_path.parent.mkdir(exist_ok=True)
-    climatology.to_zarr(
+    delayed_mean = climatology.to_zarr(
         climatology_path,
         zarr_format=2,
         mode="w",
+        compute=False,
     )
+    delayed_std = climatology_std.to_zarr(
+        climatology_std_path,
+        zarr_format=2,
+        mode="w",
+        compute=False,
+    )
+    dask.compute(delayed_mean, delayed_std)
+
     logging.info("Done.")
 
     client.close()
