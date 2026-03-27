@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 
-import dask
 import xarray as xr
 from dask.distributed import Client
 
@@ -48,19 +47,17 @@ if __name__ == "__main__":
 
     logging.info("Saving to disk...")
     climatology_path.parent.mkdir(exist_ok=True)
-    delayed_mean = climatology.to_zarr(
-        climatology_path,
-        zarr_format=2,
-        mode="w",
-        compute=False,
-    )
-    delayed_std = climatology_std.to_zarr(
+    climatology_std_path.parent.mkdir(exist_ok=True)
+    climatology_std.to_zarr(
         climatology_std_path,
         zarr_format=2,
         mode="w",
-        compute=False,
     )
-    dask.compute(delayed_mean, delayed_std)
+    climatology.to_zarr(
+        climatology_path,
+        zarr_format=2,
+        mode="w",
+    )
 
     logging.info("Done.")
 
