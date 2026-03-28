@@ -78,6 +78,71 @@ def compute_rmse(
     return xr.ufuncs.sqrt(rmse)
 
 
+def compute_mae(
+    ground_truth: xr.DataArray,
+    prediction: xr.DataArray,
+    lat_weighting: bool = True,
+    dims: str | tuple[str, ...] = ("latitude", "longitude"),
+) -> xr.DataArray:
+    """Compute the Mean Absolute Error (MAE) of a prediction,
+    averaging along the specified dimension(s).
+
+    Parameters
+    ----------
+    ground_truth: xr.DataArray
+        A dask- or numpy-backed DataArray containing the ground truth
+        data.
+    prediction: xr.DataArray
+        A dask- or numpy-backed DataArray containing the prediction (
+        a reconstruction or a forecast). The prediction and ground truth
+        must be defined on the same spatio-temporal grid.
+    lat_weights: bool, optional
+        Whether to apply a weighting function so that spatial locations
+        in a lat/lon grid closer to the Equator receive a larger weight
+        than those closer to the poles. Default is True.
+    dims: str | tuple[str], optional
+        Dimensions along which to average the MAE. The default is
+        ("latitude", "longitude"), which would return the MAE as a function
+        of prediction time (assuming a single pressure level).
+
+    Returns
+    -------
+    xr.DataArray:
+        A dask- or numpy-backed DataArray containing the calculated MAE score.
+
+    Notes
+    -----
+    If the inputs are dask-backed DataArrays, the function will build the
+    task graph lazily, which you can then execute manually. You should set up
+    a multi-threading Dask cluster before calling the function.
+    """
+
+    try:
+        # will raise error if not on the same spatio-temporal grid
+        xr.align(ground_truth, prediction, join="exact")
+    except ValueError as e:
+        msg = (
+            "The input arrays cannot be aligned. Are they defined "
+            "on the same spatio-temporal grid?"
+        )
+        raise ValueError(msg) from e
+    prediction = prediction.real  # keep only real part of the prediction
+    mae = ground_truth.copy(data=np.abs(ground_truth - prediction))
+    if mae.size == 0:
+        msg = (
+            "The resulting array is empty. Do the ground truth and prediction "
+            "arrays share coordinates?"
+        )
+        raise ValueError(msg)
+    if lat_weighting:
+        if "latitude" not in ground_truth.dims:
+            msg = "Expected the input data to have a dimension named latitude."
+            raise ValueError(msg)
+        lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
+        mae = mae.weighted(lat_weights)
+    return mae.mean(dim=dims).clip(min=0)
+
+
 def compute_climatology(
     data: xr.DataArray,
     smooth_window: int | None = 61,
