@@ -56,21 +56,21 @@ def compute_rmse(
     >>> # trigger computation and materialize as numpy-backed DataArray
     >>> rmse = rmse.compute()
     """
-    if set(ground_truth.dims) != set(prediction.dims):
-        msg = "The dimensions of the ground truth data and prediction don't match."
-        raise ValueError(msg)
-    if "latitude" not in ground_truth.dims:
-        msg = "Expected the input data to have a dimension named latitude."
-        raise ValueError(msg)
+    try:
+        # will raise error if not on the same spatio-temporal grid
+        xr.align(ground_truth, prediction, join="exact")
+    except ValueError as e:
+        msg = (
+            "The input arrays cannot be aligned. Are they defined "
+            "on the same spatio-temporal grid?"
+        )
+        raise ValueError(msg) from e
     prediction = prediction.real  # keep only real part of the prediction
     rmse = ground_truth.copy(data=(ground_truth - prediction) ** 2)
-    if rmse.size == 0:
-        msg = (
-            "The resulting array is empty. Do the ground truth and prediction "
-            "arrays share coordinates?"
-        )
-        raise ValueError(msg)
     if lat_weighting:
+        if "latitude" not in ground_truth.dims:
+            msg = "Expected the input data to have a dimension named latitude."
+            raise ValueError(msg)
         lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
         rmse = rmse.weighted(lat_weights)
     rmse = rmse.mean(dim=dims)
@@ -128,12 +128,6 @@ def compute_mae(
         raise ValueError(msg) from e
     prediction = prediction.real  # keep only real part of the prediction
     mae = ground_truth.copy(data=np.abs(ground_truth - prediction))
-    if mae.size == 0:
-        msg = (
-            "The resulting array is empty. Do the ground truth and prediction "
-            "arrays share coordinates?"
-        )
-        raise ValueError(msg)
     if lat_weighting:
         if "latitude" not in ground_truth.dims:
             msg = "Expected the input data to have a dimension named latitude."
