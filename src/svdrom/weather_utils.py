@@ -75,7 +75,7 @@ def compute_rmse(
         rmse = rmse.weighted(lat_weights)
     rmse = rmse.mean(dim=dims)
     rmse = rmse.clip(min=0)
-    return xr.ufuncs.sqrt(rmse)
+    return np.sqrt(rmse)
 
 
 def compute_mae(
