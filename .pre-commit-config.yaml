@@ -42,3 +42,4 @@ repos:
           - pydmd
           - pandas
           - pandas-stubs
+          - weatherbench2 @ git+https://github.com/google-research/weatherbench2.git
