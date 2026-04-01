@@ -47,7 +47,10 @@ weather = [
   "weatherbench2 @ git+https://github.com/google-research/weatherbench2.git",
   "properscoring @ git+https://github.com/SVDROM/properscoring.git",
 ]
-docs = ["sphinx"]
+docs = [
+  "sphinx",
+  "myst-parser",
+]
 
 [project.urls]
 Homepage = "https://github.com/dsj976/svdrom"
