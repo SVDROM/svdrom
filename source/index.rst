@@ -16,4 +16,5 @@ This is achieved by using scalable implementations of the ROM algorithms, and by
    :maxdepth: 2
    :caption: Contents:
 
+   contents/about
    contents/installation
