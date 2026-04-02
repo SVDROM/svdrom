@@ -18,3 +18,4 @@ This is achieved by using scalable implementations of the ROM algorithms, and by
 
    contents/about
    contents/installation
+   contents/dmd
