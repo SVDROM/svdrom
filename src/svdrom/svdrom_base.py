@@ -61,5 +61,5 @@ class DecompositionModel(ABC):
                     f"This {self.__class__.__name__} instance is not fitted yet. "
                     "Call 'fit' with appropriate arguments before using this estimator."
                 )
-                logger.exception(msg)
+                logger.error(msg)
                 raise RuntimeError(msg)
