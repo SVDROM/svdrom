@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, List
 
-import numpy as np
 import xarray as xr
 
 from svdrom.logger import setup_logger
@@ -30,7 +28,7 @@ class DecompositionModel(ABC):
         return self._n_components
 
     @abstractmethod
-    def fit(self, *args, **kwargs) -> None:
+    def fit(self, *args, **kwargs) -> "DecompositionModel":
         """Fit the model to the data.
 
         Parameters
@@ -40,10 +38,11 @@ class DecompositionModel(ABC):
         **kwargs : dict
             Arbitrary keyword arguments.
         """
-        pass
 
     @abstractmethod
-    def reconstruct(self, *args, **kwargs) -> xr.DataArray:
+    def reconstruct(
+        self, *args, **kwargs
+    ) -> xr.DataArray | tuple[xr.DataArray, xr.DataArray]:
         """Reconstruct the data using the fitted model.
 
         Returns
@@ -51,9 +50,8 @@ class DecompositionModel(ABC):
         xr.DataArray
             The reconstructed data.
         """
-        pass
 
-    def _check_is_fitted(self, attributes: List[str]) -> None:
+    def _check_is_fitted(self, attributes: list[str]) -> None:
         """Checks if the model is fitted by verifying the existence
         of specific attributes.
 

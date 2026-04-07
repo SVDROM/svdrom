@@ -45,11 +45,13 @@ class DataGenerator:
         vars: list | None = None,
         seed: int | None = 1234,
     ):
-        self.x = x if x else np.arange(0, 10)
-        self.y = y if y else np.arange(0, 10)
-        self.z = z if z else np.arange(0, 5)
+        self.x = x if x is not None else np.arange(0, 10)
+        self.y = y if y is not None else np.arange(0, 10)
+        self.z = z if z is not None else np.arange(0, 5)
         self.t = (
-            t if t else np.arange(0, 20, dtype="datetime64[s]").astype("datetime64[ns]")
+            t
+            if t is not None
+            else np.arange(0, 20, dtype="datetime64[s]").astype("datetime64[ns]")
         )
         self.vars = vars if vars else ["U", "V", "W"]
         self.rng = np.random.default_rng(seed)
@@ -255,7 +257,7 @@ class SignalGenerator:
         self.da = xr.DataArray.from_dict(data)
         return self
 
-    def _generate_signal(
+    def generate_signal(
         self, noise_std: float = 0.2, random_seed: int | None = None
     ) -> "SignalGenerator":
         """Generate signal with three superimposed sinusoids and
@@ -296,7 +298,7 @@ class SignalGenerator:
             (i.e. with one time lag). The default is True.
         """
         if not self.components:
-            self._generate_signal(noise_std=noise_std, random_seed=random_seed)
+            self.generate_signal(noise_std=noise_std, random_seed=random_seed)
         if apply_delay_embedding:
             self._apply_delay_embedding()
         n_components = (

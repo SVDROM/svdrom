@@ -3,8 +3,9 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 
-from svdrom.svdrom_base import DecompositionModel
+import svdrom.config as config
 from svdrom.logger import setup_logger
+from svdrom.svdrom_base import DecompositionModel
 
 logger = setup_logger("SVD", "svd.log")
 
@@ -84,8 +85,8 @@ class TruncatedSVD(DecompositionModel):
         function. The 'randomized' algorithm is implemented via Dask's
         `dask.array.linalg.svd_compressed` function.
         """
-        super().__init__(n_components=n_components) # Inherit from baseclass
-        
+        super().__init__(n_components=n_components)  # Inherit from baseclass
+
         self._algorithm = algorithm
         self._compute_u = compute_u
         self._compute_v = compute_v
@@ -191,6 +192,7 @@ class TruncatedSVD(DecompositionModel):
             coords = {k: v for k, v in X.coords.items() if k != old_dims[1]}
             coords["components"] = np.arange(singular_vectors.shape[1])
             name = "svd_u"
+            attrs = None
         elif singular_vectors.shape[1] == X.shape[1]:
             # this corresponds to `v`: replace first dimension (e.g. 'samples')
             old_dims = list(X.dims)
@@ -198,6 +200,15 @@ class TruncatedSVD(DecompositionModel):
             coords = {old_dims[1]: X.coords[old_dims[1]]}
             coords["components"] = np.arange(singular_vectors.shape[0])
             name = "svd_v"
+            attrs = (
+                {
+                    config.get("hankel_time_mapping_attr"): X.attrs[
+                        config.get("hankel_time_mapping_attr")
+                    ]
+                }
+                if config.get("hankel_time_mapping_attr") in X.attrs
+                else None
+            )
         else:
             msg = (
                 "Cannot transform singular vectors into Xarray DataArray. "
@@ -205,13 +216,19 @@ class TruncatedSVD(DecompositionModel):
             )
             logger.exception(msg)
             raise ValueError(msg)
-        return xr.DataArray(singular_vectors, dims=new_dims, coords=coords, name=name)
+        return xr.DataArray(
+            singular_vectors,
+            dims=new_dims,
+            coords=coords,
+            name=name,
+            attrs=attrs,
+        )
 
     def fit(
         self,
         X: xr.DataArray,
         **kwargs,
-    ) -> None:
+    ) -> "TruncatedSVD":
         """Fit the SVD model to the input array.
 
         Parameters
@@ -284,6 +301,8 @@ class TruncatedSVD(DecompositionModel):
         self._s = s
         self._v = self._singular_vectors_to_dataarray(v, X)
         self._explained_var_ratio = explained_var_ratio
+
+        return self
 
     def compute_u(self) -> None:
         """Compute left singular vectors if they are
