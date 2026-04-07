@@ -75,8 +75,7 @@ class OptDMD(DecompositionModel):
         This class is a wrapper of the `BOPDMD.fit_econ()` method, which fits
         an approximate Optimized DMD on an array X by operating on the SVD of X.
         """
-        super().__init__(n_components=n_modes)
-        if self.n_components != -1 and self.n_components < 1:
+        if n_modes != -1 and n_modes < 1:
             msg = "'n_modes' must be a positive integer or -1."
             logger.exception(msg)
             raise ValueError(msg)
@@ -102,7 +101,8 @@ class OptDMD(DecompositionModel):
             logger.exception(msg)
             raise ValueError(msg)
 
-        self._n_modes = n_modes
+        super().__init__(n_components=n_modes)
+
         self._time_dimension = time_dimension
         self._time_units = time_units
         self._input_time_units = input_time_units or time_units
@@ -129,7 +129,7 @@ class OptDMD(DecompositionModel):
     @property
     def n_modes(self) -> int:
         """Number of DMD modes (read-only)."""
-        return self._n_modes
+        return self._n_components
 
     @property
     def time_dimension(self) -> str:
@@ -606,22 +606,26 @@ class OptDMD(DecompositionModel):
         of the Hankel pre-processed matrix via the TruncatedSVD class.
         """
         self._check_svd_inputs(u, s, v)
-        if self._n_modes > len(s):
+        if self._n_components > len(s):
             msg = (
                 "The requested number of DMD modes exceeds the number "
                 "of available SVD components."
             )
             logger.exception(msg)
             raise ValueError(msg)
-        if self._n_modes == -1:
-            self._n_modes = len(s)
-        u, s, v = u[:, : self._n_modes], s[: self._n_modes], v[: self._n_modes, :]
+        if self._n_components == -1:
+            self._n_components = len(s)
+        u, s, v = (
+            u[:, : self._n_components],
+            s[: self._n_components],
+            v[: self._n_components, :],
+        )
         if config.get("hankel_coord_name") in u.coords:
             self._hankel_d = len(np.unique(u[config.get("hankel_coord_name")].values))
             self._hankel_time_mapping = v.attrs[config.get("hankel_time_mapping_attr")]
 
         bopdmd = BOPDMD(
-            svd_rank=self._n_modes,
+            svd_rank=self._n_components,
             use_proj=True,
             proj_basis=u.data,
             num_trials=self._num_trials,

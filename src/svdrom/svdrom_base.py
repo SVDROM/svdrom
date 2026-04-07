@@ -13,7 +13,7 @@ class DecompositionModel(ABC):
     Enforces a common interface for SVD, POD, DMD, SPOD, etc.
     """
 
-    def __init__(self, n_components: int):
+    def __init__(self, n_components: int) -> None:
         """
         Parameters
         ----------
@@ -21,11 +21,6 @@ class DecompositionModel(ABC):
             The number of components/modes to keep.
         """
         self._n_components = n_components
-
-    @property
-    def n_components(self) -> int:
-        """Number of components/modes (read-only)."""
-        return self._n_components
 
     @abstractmethod
     def fit(self, *args, **kwargs) -> "DecompositionModel":
