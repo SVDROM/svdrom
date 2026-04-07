@@ -1052,10 +1052,7 @@ class OptDMD(DecompositionModel):
             Xarrays are NumPy-backed or Dask-backed depending on the
             'memory_limit_bytes' parameter.
         """
-        if self._solver is None:
-            msg = "The OptDMD model must be fitted before forecasting."
-            logger.exception(msg)
-            raise RuntimeError(msg)
+        self._check_is_fitted(["_solver"])
         try:
             t_forecast, time_forecast = self._generate_forecast_time_vector(
                 forecast_span, dt
@@ -1286,11 +1283,7 @@ class OptDMD(DecompositionModel):
         Reconstruct the whole training dataset, which could be huge:
         >>> optdmd.reconstruct()
         """
-        if self._solver is None:
-            msg = "The OptDMD model must be fitted before reconstructing."
-            logger.exception(msg)
-            raise RuntimeError(msg)
-
+        self._check_is_fitted(["_solver"])
         try:
             t_reconstruct, time_reconstruct, lags = (
                 self._generate_reconstruct_time_vector(t)
