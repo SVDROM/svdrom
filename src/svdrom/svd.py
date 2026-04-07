@@ -160,21 +160,21 @@ class TruncatedSVD(DecompositionModel):
                 "The input array must be 2-dimensional. "
                 f"Got a {X.ndim}-dimensional array."
             )
-            logger.exception(msg)
+            logger.error(msg)
             raise ValueError(msg)
         if self._n_components >= X.shape[1]:
             msg = (
                 "n_components must be less than n_features. "
                 f"Got n_components: {self.n_components}, n_features: {X.shape[1]}."
             )
-            logger.exception(msg)
+            logger.error(msg)
             raise ValueError(msg)
         if not isinstance(X.data, da.Array):
             msg = (
                 f"The {self.__class__.__name__} class only supports Dask-backed "
                 f"Xarray DataArrays. Got {type(X.data)} instead."
             )
-            logger.exception(msg)
+            logger.error(msg)
             raise TypeError(msg)
 
     def _singular_vectors_to_dataarray(
@@ -214,7 +214,7 @@ class TruncatedSVD(DecompositionModel):
                 "Cannot transform singular vectors into Xarray DataArray. "
                 "Shape of singular_vectors does not match X."
             )
-            logger.exception(msg)
+            logger.error(msg)
             raise ValueError(msg)
         return xr.DataArray(
             singular_vectors,
@@ -245,7 +245,7 @@ class TruncatedSVD(DecompositionModel):
                 f"Unsupported algorithm: {self._algorithm}. "
                 "Supported algorithms are 'tsqr' and 'randomized'."
             )
-            logger.exception(msg)
+            logger.error(msg)
             raise ValueError(msg)
 
         self._check_array(X)
@@ -308,10 +308,8 @@ class TruncatedSVD(DecompositionModel):
         """Compute left singular vectors if they are
         still a lazy Dask collection.
         """
-        if self._u is None:
-            msg = "You must call fit() before calling compute_u()."
-            logger.exception(msg)
-            raise ValueError(msg)
+        self._check_is_fitted(["_u"])
+        assert self._u is not None  # needed for mypy check
         msg = "Computing left singular vectors..."
         logger.info(msg)
         self._u = self._u.compute()
@@ -322,10 +320,8 @@ class TruncatedSVD(DecompositionModel):
         """Compute right singular vectors if they are
         still a lazy Dask collection.
         """
-        if self._v is None:
-            msg = "You must call fit() before calling compute_v()."
-            logger.exception(msg)
-            raise ValueError(msg)
+        self._check_is_fitted(["_v"])
+        assert self._v is not None  # needed for mypy check
         msg = "Computing right singular vectors..."
         logger.info(msg)
         self._v = self._v.compute()
@@ -336,10 +332,7 @@ class TruncatedSVD(DecompositionModel):
         """Compute the ratio of explained variance if it is
         still a lazy Dask collection.
         """
-        if self._explained_var_ratio is None:
-            msg = "You must call fit() before calling compute_var_ratio()."
-            logger.exception(msg)
-            raise ValueError(msg)
+        self._check_is_fitted(["_explained_var_ratio"])
         msg = "Computing explained variance ratio..."
         logger.info(msg)
         if isinstance(self._explained_var_ratio, da.Array):
@@ -366,7 +359,7 @@ class TruncatedSVD(DecompositionModel):
                 "Computed right singular vectors are "
                 "required in order to call transform()."
             )
-            logger.exception(msg)
+            logger.error(msg)
             raise ValueError(msg)
         X_da = X.data
         try:
@@ -416,18 +409,10 @@ class TruncatedSVD(DecompositionModel):
         # Reconstructs all snapshots with label '2017-01-01'
         >>> tsvd.reconstruct_snapshot("2017-01-01")
         """
-
-        if not (
-            isinstance(self._u, xr.DataArray)
-            and isinstance(self._v, xr.DataArray)
-            and isinstance(self._s, np.ndarray)
-        ):
-            msg = (
-                "Computed left and right singular vectors and "
-                "singular values are required before calling reconstruct()."
-            )
-            logger.exception(msg)
-            raise ValueError(msg)
+        self._check_is_fitted(["_u", "_v", "_s"])
+        assert self._u is not None  # needed for mypy check
+        assert self._v is not None
+        assert self._s is not None
 
         if isinstance(snapshot, int):
             try:
@@ -436,7 +421,7 @@ class TruncatedSVD(DecompositionModel):
                 if snapshot_dim in self._u.dims:
                     return (self._u[snapshot_dim, :] * self._s) @ self._v
                 msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
-                logger.exception(msg)
+                logger.error(msg)
                 raise ValueError(msg)
             except IndexError as e:
                 msg = (
@@ -452,7 +437,7 @@ class TruncatedSVD(DecompositionModel):
                 if snapshot_dim in self._u.dims:
                     return (self._u.loc[snapshot_dim, :] * self._s) @ self._v
                 msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
-                logger.exception(msg)
+                logger.error(msg)
                 raise ValueError(msg)
             except KeyError as e:
                 msg = f"Snapshot '{snapshot}' not found in the right singular vectors."
