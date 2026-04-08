@@ -42,8 +42,8 @@ class DecompositionModel(ABC):
 
         Returns
         -------
-        xr.DataArray
-            The reconstructed data.
+        xr.DataArray | tuple[xr.DataArray, xr.DataArray]
+            The reconstructed data (deterministic or probabilistic).
         """
 
     def _check_is_fitted(self, attributes: list[str]) -> None:
