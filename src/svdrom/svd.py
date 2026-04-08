@@ -404,10 +404,10 @@ class TruncatedSVD(DecompositionModel):
         Examples
         --------
         # Reconstructs the first snapshot
-        >>> tsvd.reconstruct_snapshot(0)
+        >>> tsvd.reconstruct(0)
 
         # Reconstructs all snapshots with label '2017-01-01'
-        >>> tsvd.reconstruct_snapshot("2017-01-01")
+        >>> tsvd.reconstruct("2017-01-01")
         """
         self._check_is_fitted(["_u", "_v", "_s"])
         assert self._u is not None  # needed for mypy check
