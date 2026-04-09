@@ -200,14 +200,14 @@ def test_transform(matrix_type):
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
-def test_reconstruct_snapshot(matrix_type):
-    """Test the reconstruct_snapshot method of TruncatedSVD."""
+def test_reconstruct(matrix_type):
+    """Test the reconstruct method of TruncatedSVD."""
     X = make_dataarray(matrix_type)
     n_components = 10
     tsvd = TruncatedSVD(n_components=n_components)
     tsvd.fit(X)
 
-    X_r = tsvd.reconstruct_snapshot(0)
+    X_r = tsvd.reconstruct(0)
     assert isinstance(
         X_r, xr.DataArray
     ), f"Reconstructed snapshot should be an xarray DataArray, got {type(X_r)}."

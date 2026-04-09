@@ -10,11 +10,12 @@ from pydmd import BOPDMD
 
 import svdrom.config as config
 from svdrom.logger import setup_logger
+from svdrom.svdrom_base import DecompositionModel
 
 logger = setup_logger("DMD", "dmd.log")
 
 
-class OptDMD:
+class OptDMD(DecompositionModel):
     def __init__(
         self,
         n_modes: int = -1,
@@ -100,7 +101,8 @@ class OptDMD:
             logger.exception(msg)
             raise ValueError(msg)
 
-        self._n_modes = n_modes
+        super().__init__(n_components=n_modes)
+
         self._time_dimension = time_dimension
         self._time_units = time_units
         self._input_time_units = input_time_units or time_units
@@ -127,7 +129,7 @@ class OptDMD:
     @property
     def n_modes(self) -> int:
         """Number of DMD modes (read-only)."""
-        return self._n_modes
+        return self._n_components
 
     @property
     def time_dimension(self) -> str:
@@ -604,22 +606,26 @@ class OptDMD:
         of the Hankel pre-processed matrix via the TruncatedSVD class.
         """
         self._check_svd_inputs(u, s, v)
-        if self._n_modes > len(s):
+        if self._n_components > len(s):
             msg = (
                 "The requested number of DMD modes exceeds the number "
                 "of available SVD components."
             )
             logger.exception(msg)
             raise ValueError(msg)
-        if self._n_modes == -1:
-            self._n_modes = len(s)
-        u, s, v = u[:, : self._n_modes], s[: self._n_modes], v[: self._n_modes, :]
+        if self._n_components == -1:
+            self._n_components = len(s)
+        u, s, v = (
+            u[:, : self._n_components],
+            s[: self._n_components],
+            v[: self._n_components, :],
+        )
         if config.get("hankel_coord_name") in u.coords:
             self._hankel_d = len(np.unique(u[config.get("hankel_coord_name")].values))
             self._hankel_time_mapping = v.attrs[config.get("hankel_time_mapping_attr")]
 
         bopdmd = BOPDMD(
-            svd_rank=self._n_modes,
+            svd_rank=self._n_components,
             use_proj=True,
             proj_basis=u.data,
             num_trials=self._num_trials,
@@ -1046,10 +1052,7 @@ class OptDMD:
             Xarrays are NumPy-backed or Dask-backed depending on the
             'memory_limit_bytes' parameter.
         """
-        if self._solver is None:
-            msg = "The OptDMD model must be fitted before forecasting."
-            logger.exception(msg)
-            raise RuntimeError(msg)
+        self._check_is_fitted(["_solver"])
         try:
             t_forecast, time_forecast = self._generate_forecast_time_vector(
                 forecast_span, dt
@@ -1280,11 +1283,7 @@ class OptDMD:
         Reconstruct the whole training dataset, which could be huge:
         >>> optdmd.reconstruct()
         """
-        if self._solver is None:
-            msg = "The OptDMD model must be fitted before reconstructing."
-            logger.exception(msg)
-            raise RuntimeError(msg)
-
+        self._check_is_fitted(["_solver"])
         try:
             t_reconstruct, time_reconstruct, lags = (
                 self._generate_reconstruct_time_vector(t)
