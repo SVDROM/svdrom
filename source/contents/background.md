@@ -61,15 +61,27 @@ We can perform a truncated SVD of the dataset with rank $k=2$, which results in 
 
 The 2 retained modes represent the large-scale periodic vortex shedding, while all smaller scales (including the artificial white noise), are represented by the modes that we have discarded.
 
-## Scalable algorithms
+## Scalable SVD algorithms
 
-SVD-ROM enables the application of SVD to matrices larger than memory by making use of the randomized SVD [1].
-When combined with a communication-efficient, parallel QR factorization for tall-and-skinny matrices (TSQR) [2], it enables scalable low-rank approximations of arbitrarily large, moderately wide matrices [3].
+SVD-ROM employs [Dask](https://docs.dask.org/en/stable/) for parallel, out-of-core computation.
+The [Dask Array API](https://docs.dask.org/en/stable/array.html) enables working with arrays larger than memory by cutting them up into many small blocks and applying blocked algorithms coordinated with dynamic task scheduling [1].
+
+A scalable implementation of the SVD is provided by Dask's [`svd_compressed()`](https://docs.dask.org/en/stable/generated/dask.array.linalg.svd_compressed.html).
+This function enables the application of the SVD to arbitrarily large matrices, eliminating the tall-and-skinny requirement while preserving efficiency and accuracy [2].
+In the first step, a random projection is applied to the input matrix $\mathbf{X}$, which may contain a considerably large number of columns ($n$).
+This approach assumes that the input matrix is low-rank, and therefore most of the action of $\mathbf{X}$ occurs in a subspace.
+The main idea is that this subspace can be identified through random sampling [3].
+The moderately-wide input matrix $\mathbf{X}$ is then compressed by projecting it into this much smaller subspace, converting it into a tall-and-skinny matrix $\mathbf{Y}$ of approximately the same column space.
+In the second step, a parallel and communication-efficient algorithm for direct QR factorization of tall-and-skinny matrices (TSQR) [4] is applied to $\mathbf{Y}$.
+A major advantage of applying the direct QR factorization, compared to other approaches, is numerical stability.
+The result of the second step is an approximate SVD of $\mathbf{X}$ that is massively scalable while retaining accuracy and stability.
 
 ## References
 
-[1] Halko, N., Martinsson, P. G., Tropp, J. A. (2011). Finding structure with randomness: Probabilistic algorithms for constructing approximate matrix decompositions. SIAM Review 53(2), 217–288.
+[1] Rocklin, M (2015). Dask: Parallel computation with blocked algorithms and task scheduling. Proceedings of the 14th Python in Science Conference, 126-132.
 
-[2] Benson, A. R., Gleich, D. F., Demmel, J. (2013). Direct QR factorizations for tall-and-skinny matrices in MapReduce architectures. 2013 IEEE International Conference on Big Data, 264-272.
+[2] Tepper, M., Sapiro, G. (2016). Compressed Nonnegative Matrix Factorization Is Fast and Accurate. IEEE Transactions on Signal Processing, 64(9), 2269-2283.
 
-[3] Tepper, M., Sapiro, G. (2016). Compressed Nonnegative Matrix Factorization Is Fast and Accurate. IEEE Transactions on Signal Processing, 64(9), 2269-2283.
+[3] Halko, N., Martinsson, P. G., Tropp, J. A. (2011). Finding structure with randomness: Probabilistic algorithms for constructing approximate matrix decompositions. SIAM Review 53(2), 217–288.
+
+[4] Benson, A. R., Gleich, D. F., Demmel, J. (2013). Direct QR factorizations for tall-and-skinny matrices in MapReduce architectures. 2013 IEEE International Conference on Big Data, 264-272.
