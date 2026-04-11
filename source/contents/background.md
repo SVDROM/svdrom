@@ -6,7 +6,7 @@ Despite their high dimensionality, datasets in fluid dynamics, weather, and clim
 For instance, at certain flow velocities, periodic vortex shedding will take place behind a circular cylinder in a cross-flow, which will dominate the dynamics.
 If we consider temperature across the Earth's atmosphere, while there are many scales of variability, the temperature fluctuations will be dominated by the seasonal component with annual frequency.
 Both of these examples correspond to spatio-temporal dynamical systems, where there are spatially coherent motions that oscillate over time.
-[Singular Value Decomposition](https://en.wikipedia.org/wiki/Singular_value_decomposition) (SVD)-based methods provide efficient and interpretable tools for linear dimensionality reduction in such systems.
+[Singular Value Decomposition](https://en.wikipedia.org/wiki/Singular_value_decomposition) (SVD)-based methods provide efficient and interpretable tools for linear Reduced Order Modeling (ROM) such systems.
 
 ## Representing the data as a spatio-temporal matrix
 
@@ -18,6 +18,13 @@ In weather and climate modeling, the situation is somewhat different because the
 As a result, while the spatial dimension typically still dominates (particularly for global weather models), we might end up with thousands or event tens of thousands of temporal snapshots.
 In these situations we might classify the resulting matrix $\mathbf{X}$ as *moderately wide*, rather than strictly tall-and-skinny.
 
+An illustration of what the spatio-temporal matrix would look like is given below.
+
+```{image} ../media/spatio-temporal-matrix.png
+:width: 400px
+:align: center
+```
+
 Given a $(m \times n)$ matrix $\mathbf{X}$, its SVD is defined as:
 
 $$
@@ -27,7 +34,7 @@ $$
 where $\mathbf{U}$ is the $(m \times m)$ matrix of **left singular vectors**, $\mathbf{\Sigma}$ is the $(m \times n)$ rectangular diagonal matrix of **singular values**, $\mathbf{V}$ is the $(n \times n)$ matrix of **right singular vectors**, and $\mathbf{V}^{*}$ is the conjugate transpose of $\mathbf{V}$.
 If $\mathbf{X}$ is tall-and-skinny, then $m >> n$.
 
-To perform reduced order modeling (ROM), instead of computing the exact SVD by retaining all singular values, we compute a truncated SVD where we only keep the top $k$ singular values.
+To perform ROM, instead of computing the exact SVD by retaining all singular values, we compute a truncated SVD where we only keep the top $k$ singular values.
 This allows to perform a rank $k$ approximation of $\mathbf{X}$:
 
 $$
@@ -36,6 +43,23 @@ $$
 
 where $\mathbf{U}_k$, $\mathbf{\Sigma}_k$ and $\mathbf{V}_{k}$ now have size $(m \times k)$, $(k \times k)$ and $(n \times k)$, respectively.
 If $\mathbf{X}$ truly exhibits low-rank structure, then $k << n$ while $\mathbf{X}_k$ retains most of the variance of $\mathbf{X}$.
+
+To illustrate the usefulness of low-rank approximations for spatio-temporal dynamical systems, consider the figure below which shows a snapshot of vortex shedding behind a cylinder in a cross-flow.
+The flow field has been polluted artificially with uncorrelated white noise, which is why the image appears so pixelated.
+
+```{image} ../media/cylinder-full-rank.png
+:width: 400px
+:align: center
+```
+
+We can perform a truncated SVD of the dataset with rank $k=2$, which results in the following reconstruction of the flow field:
+
+```{image} ../media/cylinder-low-rank.png
+:width: 400px
+:align: center
+```
+
+The 2 retained modes represent the large-scale periodic vortex shedding, while all smaller scales (including the artificial white noise), are represented by the modes that we have discarded.
 
 ## Scalable algorithms
 
