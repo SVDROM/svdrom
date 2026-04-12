@@ -74,7 +74,7 @@ The main idea is that this subspace can be identified through random sampling [3
 The moderately-wide input matrix $\mathbf{X}$ is then compressed by projecting it into this much smaller subspace, converting it into a tall-and-skinny matrix $\mathbf{Y}$ of approximately the same column space.
 In the second step, a parallel and communication-efficient algorithm for direct QR factorization of tall-and-skinny matrices (TSQR) [4] is applied to $\mathbf{Y}$.
 A major advantage of applying the direct QR factorization, compared to other approaches, is numerical stability.
-The result of the second step is an approximate SVD of $\mathbf{X}$ that is massively scalable while retaining accuracy and stability.
+The result of a randomized projection + TSQR is an approximate SVD of $\mathbf{X}$ that is massively scalable while retaining accuracy and stability.
 
 ## Dynamic Mode Decomposition
 
