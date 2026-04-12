@@ -76,6 +76,29 @@ In the second step, a parallel and communication-efficient algorithm for direct 
 A major advantage of applying the direct QR factorization, compared to other approaches, is numerical stability.
 The result of the second step is an approximate SVD of $\mathbf{X}$ that is massively scalable while retaining accuracy and stability.
 
+## Dynamic Mode Decomposition
+
+[Dynamic Mode Decomposition](https://en.wikipedia.org/wiki/Dynamic_mode_decomposition) (DMD) extends the ROM framework of SVD to time-resolved data by extracting coherent spatio-temporal structures and their associated dynamics [5].
+The SVD by itself does not extract temporal correlation from the data.
+For instance, one could shuffle the temporal order of the columns in the spatio-temporal matrix $\mathbf{X}$ and would obtain the same modes and associated singular values.
+SVD can be understood as only performing dimensionality reduction along the spatial direction.
+DMD, on the other hand, connects the favorable aspects of the SVD for spatial dimensionality reduction and the Fast Fourier Transform (FFT) for temporal frequency identification.
+
+Formally, DMD computes an approximate spectral decomposition of a best-fit linear mapping $\mathbf{A}$ that advances the snapshot matrix $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
+
+$$
+\mathbf{X}' = \mathbf{A} \mathbf{X}
+$$
+
+The figure below, reproduced from [6], shows the result of applying DMD to a time-series of snapshots of cylinder in a cross-flow.
+The extracted DMD modes represent spatial patterns that are accompanied by corresponding temporal dynamics (with a frequency of oscillation and a growth or decay rate).
+These dynamics can be extrapolated into the future, enabling the use of DMD for forecasting.
+
+```{image} ../media/dmd-cylinder.png
+:width: 500px
+:align: center
+```
+
 ## References
 
 [1] Rocklin, M (2015). Dask: Parallel computation with blocked algorithms and task scheduling. Proceedings of the 14th Python in Science Conference, 126-132.
@@ -85,3 +108,7 @@ The result of the second step is an approximate SVD of $\mathbf{X}$ that is mass
 [3] Halko, N., Martinsson, P. G., Tropp, J. A. (2011). Finding structure with randomness: Probabilistic algorithms for constructing approximate matrix decompositions. SIAM Review 53(2), 217–288.
 
 [4] Benson, A. R., Gleich, D. F., Demmel, J. (2013). Direct QR factorizations for tall-and-skinny matrices in MapReduce architectures. 2013 IEEE International Conference on Big Data, 264-272.
+
+[5] Schmid, P. J. (2022). Dynamic Mode Decomposition and Its Variants. Annual Review of Fluid Mechanics 54, 225-254.
+
+[6] Kutz, J. N., Brunton, S. L., Brunton, B. W., Proctor, J. L. (2016). Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems.
