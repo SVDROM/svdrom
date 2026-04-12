@@ -1,6 +1,6 @@
 # Theoretical background
 
-## Singular value decomposition for linear reduced order modeling
+## Singular Value Decomposition
 
 Despite their high dimensionality, datasets in fluid dynamics, weather, and climate often exhibit low-rank structure, where a small number of dominant patterns explain most of the variability.
 For instance, at certain flow velocities, periodic vortex shedding will take place behind a circular cylinder in a cross-flow, which will dominate the dynamics.
@@ -8,7 +8,7 @@ If we consider temperature across the Earth's atmosphere, while there are many s
 Both of these examples correspond to spatio-temporal dynamical systems, where there are spatially coherent motions that oscillate over time.
 [Singular Value Decomposition](https://en.wikipedia.org/wiki/Singular_value_decomposition) (SVD)-based methods provide efficient and interpretable tools for linear Reduced Order Modeling (ROM) such systems.
 
-## Representing the data as a spatio-temporal matrix
+### Representing the data as a spatio-temporal matrix
 
 A typical way to represent these spatio-temporal systems is by arranging the data into a matrix $\mathbf{X}$, where rows represent different spatial locations and columns represent different points over time.
 Each column therefore represents a snapshot of the system at time $t$.
@@ -61,7 +61,7 @@ We can perform a truncated SVD of the dataset with rank $k=2$, which results in 
 
 The 2 retained modes represent the large-scale periodic vortex shedding, while all smaller scales (including the artificial white noise), are represented by the modes that we have discarded.
 
-## Scalable SVD algorithms
+### Scalable SVD algorithms
 
 SVD-ROM employs [Dask](https://docs.dask.org/en/stable/) for parallel, out-of-core computation.
 The [Dask Array API](https://docs.dask.org/en/stable/array.html) enables working with arrays larger than memory by cutting them up into many small blocks and applying blocked algorithms coordinated with dynamic task scheduling [1].
@@ -84,13 +84,16 @@ For instance, one could shuffle the temporal order of the columns in the spatio-
 SVD can be understood as only performing dimensionality reduction along the spatial direction.
 DMD, on the other hand, connects the favorable aspects of the SVD for spatial dimensionality reduction and the Fast Fourier Transform (FFT) for temporal frequency identification.
 
-Formally, DMD computes an approximate spectral decomposition of a best-fit linear mapping $\mathbf{A}$ that advances the snapshot matrix $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
+Formally, DMD computes an approximate spectral decomposition of a best-fit linear operator $\mathbf{A}$ that advances the snapshot matrix $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
 
 $$
 \mathbf{X}' = \mathbf{A} \mathbf{X}
 $$
 
-The figure below, reproduced from [6], shows the result of applying DMD to a time-series of snapshots of cylinder in a cross-flow.
+DMD is closely related to Koopman spectral theory.
+While DMD is fundamentally a linear approximation, it can approximate the [Koopman operator](https://en.wikipedia.org/wiki/Composition_operator), which allows nonlinear dynamics to be represented in an infinite-dimensional linear framework [6].
+
+The figure below, reproduced from [6], shows the result of applying DMD to a time-series of snapshots of a cylinder in a cross-flow.
 The extracted DMD modes represent spatial patterns that are accompanied by corresponding temporal dynamics (with a frequency of oscillation and a growth or decay rate).
 These dynamics can be extrapolated into the future, enabling the use of DMD for forecasting.
 
