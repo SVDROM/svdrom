@@ -84,7 +84,15 @@ For instance, one could shuffle the temporal order of the columns in the spatio-
 SVD can be understood as only performing dimensionality reduction along the spatial direction.
 DMD, on the other hand, connects the favorable aspects of the SVD for spatial dimensionality reduction and the Fast Fourier Transform (FFT) for temporal frequency identification.
 
-Formally, DMD computes an approximate spectral decomposition of a best-fit linear operator $\mathbf{A}$ that advances the snapshot matrix $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
+Given a ($m \times n$) matrix $\mathbf{X}$, with snapshots organized into columns, DMD seeks a rank $k$ spatio-temporal decomposition of $\mathbf{X}$ of the following form:
+
+$$
+\mathbf{X} \approx \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega}),
+$$
+
+where $\mathbf{\Phi}$ is the $(m \times k)$ matrix of DMD modes, $\mathbf{B}$ is the ($k \times k$) diagonal matrix of mode amplitudes, and $\mathbf{T}(\boldsymbol{\omega})$ is the $(k \times n)$ matrix of temporal dynamics of the form $e^{\omega_j t}$, where the $j^{th}$ row contains the time evolution of the $j^{th}$ DMD mode governed by complex frequency $\omega_j$.
+
+To compute the DMD modes and associated dynamics, the exact DMD algorithm [5] seeks the leading spectral decomposition of the best-fit linear operator $\mathbf{A}$ that advances $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
 
 $$
 \mathbf{X}' = \mathbf{A} \mathbf{X}
