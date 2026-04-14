@@ -114,7 +114,9 @@ These dynamics can be extrapolated into the future, enabling the use of DMD for 
 
 As discussed above, exact DMD (the original DMD implementation) seeks the leading spectral decomposition of the operator $\mathbf{A}$.
 However, it is known to be strongly affected by the presence of noise, which is always present in real-world datasets.
-Optimized DMD (OptDMD) [7] is a non-linear optimization of DMD enabled by variable projection methods, and avoids much of the bias of exact DMD.
+Additionally, exact DMD requires that the snapshots in $\mathbf{X}$ are evenly sampled in time.
+Optimized DMD (OptDMD) [7] is a non-linear optimization of DMD enabled by variable projection methods.
+It avoids much of the bias of exact DMD, it is robust to noise and can handle snapshots that are unevenly sampled in time.
 OptDMD solves the exponential fitting problem directly:
 
 $$
