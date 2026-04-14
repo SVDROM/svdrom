@@ -132,8 +132,21 @@ $$
 The resulting DMD modes can then be projected back to the original space using the left singular vectors $\mathbf{U}_k$.
 
 This can be viewed as an encoder (truncated SVD) $\rightarrow$ processor (OptDMD) $\rightarrow$ decoder (orthogonal projection) framework.
-If we use a highly scalable SVD algorithm (randomization + TSQR), it allows to perform DMD on huge tall-and-skinny or moderately-wide snapshot matrices $\mathbf{X}$.
+If we use a highly scalable SVD algorithm (randomization + TSQR, as implemented in Dask's `svd_compressed()`), we can  perform DMD on huge tall-and-skinny or moderately-wide snapshot matrices $\mathbf{X}$.
 This is the approach that has been implemented in SVD-ROM.
+
+### DMD with Uncertainty Quantification
+
+An enhancement built on top of the OptDMD algorithm is Bagging, Optimized DMD (BOP-DMD) [8].
+BOP-DMD produces an ensemble of OptDMD models using statistical bootstrap aggregation (bagging).
+Each ensemble member is built by fitting an OptDMD model to a random sub-sample of snapshots from the matrix $\mathbf{X}$.
+This is possible thanks to the ability of OptDMD to handle snapshots unevenly sampled in time.
+Ensemble statistics (mean and variance) are then computed, allowing to construct a BOP-DMD ensemble solution with spatial and temporal uncertainty quantification.
+The BOP-DMD solution can then be used to produce probabilistic forecasting.
+
+SVD-ROM uses [PyDMD's](https://github.com/PyDMD/PyDMD) `BOPDMD` class internally, which enables the application of OptDMD with optional bagging.
+As part of the development of SVD-ROM, `BOPDMD` was enhanced to perform bagging in parallel, massively accelerating the creation of the ensemble.
+As a result, by implementing the acceleration technique discussed above (scalable SVD followed by DMD fitting in the SVD latent space) and by using parallel bagging, SVD-ROM enables training DMD models with uncertainty quantification on huge arrays, as well as producing probabilistic forecasts using the trained models.
 
 ## References
 
@@ -150,3 +163,5 @@ This is the approach that has been implemented in SVD-ROM.
 [6] Kutz, J. N., Brunton, S. L., Brunton, B. W., Proctor, J. L. (2016). Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems.
 
 [7] Askham, T., & Kutz, J. N. (2018). Variable Projection Methods for an Optimized Dynamic Mode Decomposition. SIAM Journal on Applied Dynamical Systems, 17(1), 380-416.
+
+[8] Sashidhar, D., & Kutz, J. N. (2022). Bagging, optimized dynamic mode decomposition for robust, stable forecasting with spatial and temporal uncertainty quantification. Phil. Trans. R. Soc. A 380: 20210199.
