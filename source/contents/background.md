@@ -110,6 +110,29 @@ These dynamics can be extrapolated into the future, enabling the use of DMD for 
 :align: center
 ```
 
+### Scalable DMD algorithms
+
+As discussed above, exact DMD (the original DMD implementation) seeks the leading spectral decomposition of the operator $\mathbf{A}$.
+However, it is known to be strongly affected by the presence of noise, which is always present in real-world datasets.
+Optimized DMD (OptDMD) [7] is a non-linear optimization of DMD enabled by variable projection methods, and avoids much of the bias of exact DMD.
+OptDMD solves the exponential fitting problem directly:
+
+$$
+\mathbf{\Phi}\mathbf{B}, \boldsymbol{\omega} = \arg \min_{\mathbf{\Phi} \mathbf{B}, \boldsymbol{\omega}} || \mathbf{X} - \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega}) ||
+$$
+
+When the snapshot matrix $\mathbf{X}$ is very large, instead of solving the exponential fitting problem directly on the data, one can perform a rank $k$ truncated SVD of $\mathbf{X}$ and solve the DMD fitting problem in the SVD latent space:
+
+$$
+\mathbf{\Phi}\mathbf{B}, \boldsymbol{\omega} = \arg \min_{\mathbf{\Phi} \mathbf{B}, \boldsymbol{\omega}} || \mathbf{\Sigma}_k \mathbf{V}_k^* - \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega}) ||
+$$
+
+The resulting DMD modes can then be projected back to the original space using the left singular vectors $\mathbf{U}_k$.
+
+This can be viewed as an encoder (truncated SVD) $\rightarrow$ processor (OptDMD) $\rightarrow$ decoder (orthogonal projection) framework.
+If we use a highly scalable SVD algorithm (randomization + TSQR), it allows to perform DMD on huge tall-and-skinny or moderately-wide snapshot matrices $\mathbf{X}$.
+This is the approach that has been implemented in SVD-ROM.
+
 ## References
 
 [1] Rocklin, M (2015). Dask: Parallel computation with blocked algorithms and task scheduling. Proceedings of the 14th Python in Science Conference, 126-132.
@@ -123,3 +146,5 @@ These dynamics can be extrapolated into the future, enabling the use of DMD for 
 [5] Schmid, P. J. (2022). Dynamic Mode Decomposition and Its Variants. Annual Review of Fluid Mechanics 54, 225-254.
 
 [6] Kutz, J. N., Brunton, S. L., Brunton, B. W., Proctor, J. L. (2016). Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems.
+
+[7] Askham, T., & Kutz, J. N. (2018). Variable Projection Methods for an Optimized Dynamic Mode Decomposition. SIAM Journal on Applied Dynamical Systems, 17(1), 380-416.
