@@ -1048,6 +1048,16 @@ class OptDMD(DecompositionModel):
             ensemble mean and the second one is the ensemble variance. The
             Xarrays are NumPy-backed or Dask-backed depending on the
             'memory_limit_bytes' parameter.
+
+        Examples
+        --------
+        Given optdmd, a fitted OptDMD instance:
+
+        Produce a 45 day forecast using the time step of the training data:
+        >>> optdmd.forecast("45 D")
+
+        Produce a 45 day forecast using a 12 hour time step:
+        >>> optdmd.forecast("45 D", dt="12 h")
         """
         self._check_is_fitted(["_solver"])
         try:
