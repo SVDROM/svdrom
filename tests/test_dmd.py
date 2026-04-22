@@ -1,11 +1,18 @@
+from typing import ClassVar
+
 import dask
 import dask.array as da
 import numpy as np
 import pytest
 import xarray as xr
 from make_test_data import DataGenerator, SignalGenerator
+from pydmd import BOPDMD
+from pydmd.preprocessing import hankel_preprocessing as hankel_preprocessing_pydmd
 
+import svdrom.config as config
 from svdrom.dmd import OptDMD
+from svdrom.preprocessing import hankel_preprocessing
+from svdrom.svd import TruncatedSVD
 
 # set the dask scheduler to single-threaded
 dask.config.set(scheduler="single-threaded")
@@ -38,6 +45,9 @@ class BaseTestOptDMD:
             solver, "time_fit"
         ), "OptDMD object is missing the 'time_fit' attribute."
         assert hasattr(
+            solver, "time_fit_original"
+        ), "OptDMD object is missing the 'time_fit_original' attribute."
+        assert hasattr(
             solver, "num_trials"
         ), "OptDMD object is missing the 'num_trials' attribute."
         assert hasattr(
@@ -55,15 +65,24 @@ class BaseTestOptDMD:
         assert hasattr(
             solver, "input_time_units"
         ), "OptDMD object is missing the 'input_time_units' attribute."
+        assert hasattr(
+            solver, "hankel_d"
+        ), "OptDMD object is missing the 'hankel_d' attribute."
+        assert hasattr(
+            solver, "modes_averaged"
+        ), "OptDMD object is missing the 'modes_averaged' attribute."
+        assert hasattr(
+            solver, "modes_std_averaged"
+        ), "OptDMD object is missing the 'modes_std_averaged' attribute."
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_fit_basic(self, solver):
         """Test the fit() method of the OptDMD class."""
         solver = getattr(self, solver)
         solver.fit(
-            self.generator.u,
-            self.generator.s,
-            self.generator.v,
+            self.u,
+            self.s,
+            self.v,
             varpro_opts_dict={"maxiter": 15},
             eig_sort="imag",
         )
@@ -89,14 +108,28 @@ class BaseTestOptDMD:
             "Expected 'time_fit' to be of type 'np.ndarray', "
             f"but got {type(solver.time_fit)} instead."
         )
-        np.testing.assert_equal(
-            solver.time_fit,
-            self.generator.v.time.values,
-            strict=True,
-            err_msg=(
-                "Expected 'time_fit' vector to " "be strictly equal to 'v.time.values'."
-            ),
-        )
+        assert np.array_equal(
+            solver.time_fit, self.v.time.values
+        ), "Expected 'time_fit' vector to be strictly equal to 'v.time.values'."
+        if self.hankel_preprocessing:
+            assert isinstance(solver.time_fit_original, np.ndarray), (
+                "Expected 'time_fit_original' to be of type 'np.ndarray', "
+                f"but got {type(solver.time_fit_original)} instead."
+            )
+            time_mapping = self.v.attrs[config.get("hankel_time_mapping_attr")]
+            expected_time_fit_original = np.sort(list(time_mapping.keys()))
+            assert np.array_equal(
+                solver.time_fit_original, expected_time_fit_original
+            ), (
+                "Expected 'time_fit_original' vector to be strictly equal to "
+                "the keys of the Hankel time mapping dictionary."
+            )
+        else:
+            assert solver.time_fit_original is None, (
+                "Expected 'time_fit_original' to be None when "
+                "Hankel pre-processing has not been applied."
+            )
+
         assert isinstance(solver._t_fit, np.ndarray), (
             "Expected 't_fit' to be of type 'np.ndarray', "
             f"but got {type(solver._t_fit)} instead."
@@ -105,10 +138,17 @@ class BaseTestOptDMD:
             f"Expected 't_fit' vector to have data type float, "
             f"but got {solver._t_fit.dtype.name}."
         )
-        assert solver.modes.shape == self.generator.u.shape, (
-            f"Expected 'modes.shape' to be {self.generator.u.shape}, "
+        assert solver.modes.shape == self.u.shape, (
+            f"Expected 'modes.shape' to be {self.u.shape}, "
             f"but got {solver.modes.shape} instead."
         )
+        if self.hankel_preprocessing:
+            expected_shape = (self.u.shape[0] // self.d, self.u.shape[1])
+            assert solver.modes_averaged.shape == expected_shape, (
+                f"For an input dataset with time-delay embedding of {self.d}, "
+                f"expected 'modes_averaged.shape' to be {expected_shape}, "
+                f"but got {solver.modes.shape} instead."
+            )
         assert solver.eigs.shape == (solver.modes.shape[1],), (
             f"Expected 'eigs.shape' to be {(solver.modes.shape[1],)}, "
             f"but got {solver.eigs.shape} instead."
@@ -136,6 +176,18 @@ class BaseTestOptDMD:
                 "Expected 'modes_std' to be xr.DataArray, "
                 f"but got {solver.modes_std} instead."
             )
+            assert solver.modes_std.shape == solver.modes.shape, (
+                "Expected 'modes_std' and 'modes' to have the same shape, "
+                f"but got shapes {solver.modes_std.shape} and {solver.modes.shape}, "
+                "respectively."
+            )
+            if self.hankel_preprocessing:
+                expected_shape = (self.u.shape[0] // self.d, self.u.shape[1])
+                assert solver.modes_std_averaged.shape == expected_shape, (
+                    f"For an input dataset with time-delay embedding of {self.d}, "
+                    f"expected 'modes_std_averaged.shape' to be {expected_shape}, "
+                    f"but got {solver.modes.shape} instead."
+                )
             assert isinstance(solver.eigs_std, np.ndarray), (
                 "Expected 'eigs_std' to be np.ndarray, "
                 f"but got {solver.eigs_std} instead."
@@ -193,7 +245,7 @@ class BaseTestOptDMD:
             f"'t_forecast' to be {expected_delta_t}, but got "
             f"{np.unique(np.diff(t_forecast))} instead."
         )
-        if np.issubdtype(self.generator.t.dtype, float):
+        if np.issubdtype(self.t.dtype, float):
             assert np.unique(np.diff(time_forecast)) == expected_delta_t, (
                 "Expected the difference between consecutive elements in "
                 f"'time_forecast' to be {expected_delta_t}, but got "
@@ -218,18 +270,38 @@ class BaseTestOptDMD:
             f"by a value of {expected_delta_t},"
             f"but got a value of {t_forecast[0] - solver._t_fit[-1]} instead."
         )
-        if np.issubdtype(self.generator.t.dtype, float):
-            assert time_forecast[0] == solver.time_fit[-1] + expected_delta_t, (
-                "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
-                f"by a value of {expected_delta_t}"
-                f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
-            )
+        if np.issubdtype(self.t.dtype, float):
+            if not self.hankel_preprocessing:
+                assert time_forecast[0] == solver.time_fit[-1] + expected_delta_t, (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
+                    f"by a value of {expected_delta_t} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
+            else:
+                assert (
+                    time_forecast[0] == solver.time_fit_original[-1] + expected_delta_t
+                ), (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit_original[-1] "
+                    f"by a value of {expected_delta_t} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
+
         else:
-            assert time_forecast[0] == solver.time_fit[-1] + expected_delta_time, (
-                "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
-                f"by a value of {expected_delta_time}"
-                f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
-            )
+            if not self.hankel_preprocessing:
+                assert time_forecast[0] == solver.time_fit[-1] + expected_delta_time, (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit[-1] "
+                    f"by a value of {expected_delta_time} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
+            else:
+                assert (
+                    time_forecast[0]
+                    == solver.time_fit_original[-1] + expected_delta_time
+                ), (
+                    "Expected 'time_forecast[0]' to be ahead of time_fit_original[-1] "
+                    f"by a value of {expected_delta_time} "
+                    f"but got {time_forecast[0] - solver._time_fit[-1]} instead."
+                )
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_predict(self, solver):
@@ -324,8 +396,14 @@ class BaseTestOptDMD:
         """Test for the forecast() method."""
         solver = getattr(self, solver)
         forecast_span, dt = "10 s", "1 s"
-        expected_forecast_shape = (self.generator.u.shape[0], 10)
-        expected_forecast_dims = (self.generator.u.dims[0], solver.time_dimension)
+        if self.hankel_preprocessing:
+            expected_forecast_shape = (
+                self.u.shape[0] // self.d,
+                10,
+            )  # 10: 10s span, 1s interval
+        else:
+            expected_forecast_shape = (self.u.shape[0], 10)  # 10: 10s span, 1s interval
+        expected_forecast_dims = (self.u.dims[0], solver.time_dimension)
         _, expected_forecast_t_vector = solver._generate_forecast_time_vector(
             forecast_span=forecast_span,
             dt=dt,
@@ -397,13 +475,74 @@ class BaseTestOptDMD:
                 ),
             )
 
+    @pytest.mark.parametrize("t", [slice(10), 10])
+    def test_generate_reconstruct_time_vector(self, t):
+        """Test for the generate_reconstruct_time_vector()
+        private method.
+        """
+        solver = self.optdmd
+        t_reconstruct, time_reconstruct, _ = solver._generate_reconstruct_time_vector(t)
+        expected_t_reconstruct = np.atleast_1d(solver._t_fit[t])
+        if not self.hankel_preprocessing:
+            expected_time_reconstruct = np.atleast_1d(solver._time_fit[t])
+        else:
+            expected_time_reconstruct = np.atleast_1d(solver._time_fit_original[t])
+            if isinstance(t, slice):
+                expected_t_reconstruct = expected_t_reconstruct[: -self.d + 1]
+            else:
+                expected_t_reconstruct = solver._t_fit[t - self.d + 1]
+            expected_t_reconstruct = np.atleast_1d(expected_t_reconstruct)
+        assert np.array_equal(t_reconstruct, expected_t_reconstruct), (
+            f"Expected t_reconstruct to be {expected_t_reconstruct}, "
+            f"but got {t_reconstruct} instead."
+        )
+        assert np.array_equal(time_reconstruct, expected_time_reconstruct), (
+            f"Expected time_reconstruct to be {expected_time_reconstruct}, "
+            f"but got {time_reconstruct} instead."
+        )
+
     @pytest.mark.parametrize("t", [slice(5), slice(5, 10), 10])
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_reconstruct(self, solver, t):
         """Test for the reconstruct() method."""
         solver = getattr(self, solver)
         reconstruction = solver.reconstruct(t)
-        expected_reconstruct_dims = (self.generator.u.dims[0], solver.time_dimension)
+        expected_reconstruct_dims = (self.u.dims[0], solver.time_dimension)
+
+        def check_reconstruction_shape(reconstruction: xr.DataArray):
+            if isinstance(t, slice):
+                if self.hankel_preprocessing:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0] // self.d,
+                        5,
+                    )  # 5: len of slice
+                else:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0],
+                        5,
+                    )  # 5: len of slice
+                assert reconstruction.shape == expected_reconstruction_shape, (
+                    "Expected 'reconstruction' to have shape "
+                    f"{expected_reconstruction_shape}, "
+                    f"but got {reconstruction.shape} instead."
+                )
+            else:
+                if self.hankel_preprocessing:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0] // self.d,
+                        1,
+                    )  # 1: single snapshot
+                else:
+                    expected_reconstruction_shape = (
+                        solver._modes.shape[0],
+                        1,
+                    )  # 1: single snapshot
+                assert reconstruction.shape == expected_reconstruction_shape, (
+                    "Expected 'reconstruction' to have shape "
+                    f"{expected_reconstruction_shape}, "
+                    f"but got {reconstruction.shape} instead."
+                )
+
         if solver.num_trials == 0:
             # no bagging
             assert isinstance(reconstruction, xr.DataArray), (
@@ -414,26 +553,14 @@ class BaseTestOptDMD:
                 "Expected 'reconstruction' to have dimensions "
                 f"{expected_reconstruct_dims}, but got {reconstruction.dims} instead."
             )
-            if isinstance(t, slice):
-                assert reconstruction.shape == (solver._modes.shape[0], 5), (
-                    "Expected 'reconstruction' to have shape "
-                    f"{(solver._modes.shape[0], 5)}, "
-                    f"but got {reconstruction.shape} instead."
-                )
-            else:
-                assert reconstruction.shape == (solver._modes.shape[0], 1), (
-                    "Expected 'reconstruction' to have shape "
-                    f"{(solver._modes.shape[0], 1)}, "
-                    f"but got {reconstruction.shape} instead."
-                )
-            np.testing.assert_array_equal(
+            check_reconstruction_shape(reconstruction)
+            assert np.array_equal(
                 reconstruction[solver.time_dimension].values,
                 solver.time_fit[t],
-                err_msg=(
-                    "Expected the reconstruction time vector to be: "
-                    f"{solver.time_fit[t]}, "
-                    f"but got {reconstruction[solver.time_dimension].values} instead."
-                ),
+            ), (
+                "Expected the reconstruction time vector to be: "
+                f"{solver.time_fit[t]}, "
+                f"but got {reconstruction[solver.time_dimension].values} instead."
             )
         else:
             # with bagging
@@ -451,27 +578,14 @@ class BaseTestOptDMD:
                     "Expected 'reconstruction' to have dimensions "
                     f"{expected_reconstruct_dims}, but got {array.dims} instead."
                 )
-                np.testing.assert_array_equal(
-                    array[solver.time_dimension].values,
-                    solver.time_fit[t],
-                    err_msg=(
-                        "Expected the reconstruction time vector to be: "
-                        f"{solver.time_fit[t]}, "
-                        f"but got {array[solver.time_dimension].values} instead."
-                    ),
+                check_reconstruction_shape(array)
+                assert np.array_equal(
+                    array[solver.time_dimension].values, solver.time_fit[t]
+                ), (
+                    "Expected the reconstruction time vector to be: "
+                    f"{solver.time_fit[t]}, "
+                    f"but got {array[solver.time_dimension].values} instead."
                 )
-                if isinstance(t, slice):
-                    assert array.shape == (solver._modes.shape[0], 5), (
-                        "Expected 'reconstruction' to have shape "
-                        f"{(solver._modes.shape[0], 5)}, "
-                        f"but got {array.shape} instead."
-                    )
-                else:
-                    assert array.shape == (solver._modes.shape[0], 1), (
-                        "Expected 'reconstruction' to have shape "
-                        f"{(solver._modes.shape[0], 1)}, "
-                        f"but got {array.shape} instead."
-                    )
 
 
 class TestOptDMDRandomData(BaseTestOptDMD):
@@ -482,10 +596,12 @@ class TestOptDMDRandomData(BaseTestOptDMD):
 
     @classmethod
     def setup_class(cls):
-        cls.generator = DataGenerator(seed=1234)
-        cls.generator.generate_svd_results(n_components=10)
+        generator = DataGenerator(seed=1234)
+        generator.generate_svd_results(n_components=10)
+        cls.u, cls.s, cls.v, cls.t = generator.u, generator.s, generator.v, generator.t
         cls.optdmd = OptDMD()
         cls.optdmd_bagging = OptDMD(num_trials=5, seed=1234)
+        cls.hankel_preprocessing = False
 
 
 class TestOptDMDCoherentSignal(BaseTestOptDMD):
@@ -496,12 +612,15 @@ class TestOptDMDCoherentSignal(BaseTestOptDMD):
 
     @classmethod
     def setup_class(cls):
-        cls.generator = SignalGenerator()
-        cls.generator.generate_svd_results(random_seed=1234)
+        generator = SignalGenerator()
+        generator.generate_svd_results(random_seed=1234)
+        cls.u, cls.s, cls.v = generator.u, generator.s, generator.v
+        cls.t, cls.components = generator.t, generator.components
         cls.optdmd = OptDMD(input_time_units="s")
         cls.optdmd_bagging = OptDMD(
             input_time_units="s", num_trials=10, trial_size=0.9, seed=1234
         )
+        cls.hankel_preprocessing = False
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_correct_eigs(self, solver):
@@ -510,7 +629,7 @@ class TestOptDMDCoherentSignal(BaseTestOptDMD):
         """
         solver = getattr(self, solver)
         omegas = np.sort(
-            [component["omega"] for component in self.generator.components],
+            [component["omega"] for component in self.components],
         )[::-1]  # get the temporal frequencies of oscillation from the data generator
         eigs_imag = [
             np.abs(eig.imag) for eig in solver.eigs
@@ -526,4 +645,113 @@ class TestOptDMDCoherentSignal(BaseTestOptDMD):
                 "while the computed imaginary eigenvalues are: "
                 f"{np.round(eigs_imag, decimals=2)}."
             ),
+        )
+
+
+class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
+    """Tests for the OptDMD class using a SignalGenerator instance
+    to generate coherent spatio-temporal input data, pre-processed
+    with the Hankel pre-processor prior to SVD and DMD to apply
+    time-delay embedding.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        generator = SignalGenerator()
+        generator.generate_signal(random_seed=1234)
+        cls.components = generator.components
+        X = generator.da.transpose("x", "time")
+        cls.d = 2
+        X_d = hankel_preprocessing(X, d=cls.d)
+        cls.hankel_preprocessing = True
+        # convert to Dask-backed Xarray as TruncatedSVD currently only
+        # supports Dask arrays
+        X_d = X_d.copy(data=da.from_array(X_d.data))
+        cls.svd_rank = len(cls.components) * cls.d
+        tsvd = TruncatedSVD(n_components=cls.svd_rank)
+        tsvd.fit(X_d)
+        cls.u, cls.s, cls.v = tsvd.u, tsvd.s, tsvd.v
+        cls.t = X_d.time
+        cls.X, cls.X_d = X, X_d
+        cls.optdmd = OptDMD()
+        cls.optdmd_bagging = OptDMD(num_trials=5, seed=1234)
+
+    # set up multiple (hankel_d, lags) combinations for the next test
+    params: ClassVar[dict[int, list]] = {
+        2: [None, (0, 1), (1,)],
+        3: [None, (0, 2), (1, 2), (2,)],
+    }
+    cases: ClassVar[list[tuple]] = [
+        (hankel_d, lag) for hankel_d, lags in params.items() for lag in lags
+    ]
+
+    @pytest.mark.parametrize("array_type", ["numpy", "dask"])
+    @pytest.mark.parametrize(("hankel_d", "lags"), cases)
+    def test_extract_hankel_prediction(self, array_type, hankel_d, lags):
+        """Test for the extract_hankel_prediction method."""
+        arr = np.random.randn(100, 10)
+        if array_type == "dask":
+            arr = da.from_array(arr)
+        # need to transform array into DataArray because
+        # hankel_preprocessing() only takes DataArrays
+        X = xr.DataArray(
+            data=arr,
+            dims=("x", "t"),
+            coords={
+                "x": ("x", np.arange(arr.shape[0])),
+                "t": ("t", np.arange(arr.shape[1])),
+            },
+        )
+        X_d = hankel_preprocessing(X, hankel_d)
+        X_extracted = self.optdmd._extract_hankel_prediction(X_d.data, hankel_d, lags)
+        ind = slice(lags[0], X.shape[-1]) if lags else slice(X.shape[-1])
+        if isinstance(X_extracted, da.Array):
+            assert np.array_equal(X_extracted.compute(), X.values[:, ind]), (
+                "Expected the output of extract_hankel_preprocessing() "
+                "to match the input of hankel_preprocessing()."
+            )
+        else:
+            assert np.array_equal(X_extracted, X.values[:, ind]), (
+                "Expected the output of extract_hankel_preprocessing() "
+                "to match the input of hankel_preprocessing()."
+            )
+
+    @pytest.mark.parametrize("t", [0, 1, 5, 10, -2, -1])
+    def test_extract_hankel_time(self, t):
+        """Test for the extract_hankel_time method."""
+        t_hankel, lag = self.optdmd._extract_hankel_time(t)
+        if t < 0:
+            expected_t_hankel = t
+            expected_lag = self.d - 1
+        elif t - self.d < 0:
+            expected_t_hankel = 0
+            expected_lag = t
+        else:
+            expected_t_hankel = t - self.d + 1
+            expected_lag = self.d - 1
+        assert t_hankel == expected_t_hankel, (
+            f"Expected t_hankel to be {expected_t_hankel}, "
+            f"but got {t_hankel} instead."
+        )
+        assert (
+            lag == expected_lag
+        ), f"Expected lag to be {expected_lag}, but got {lag} instead."
+
+    def test_reconstruct_vs_pydmd(self):
+        """Test that the reconstruct() method gives a similar result
+        to PyDMD equivalent when using Hankel pre-processing.
+        """
+        optdmd_pydmd = BOPDMD(svd_rank=self.svd_rank)
+        optdmd_pydmd = hankel_preprocessing_pydmd(optdmd_pydmd, d=self.d)
+        optdmd_pydmd.fit(self.X.values, self.t)
+        reconstruction_pydmd = optdmd_pydmd.reconstructed_data.real
+        reconstruction = self.optdmd.reconstruct().values.real
+        # check that the relative Frobenius error is small
+        rel_error = np.linalg.norm(
+            reconstruction - reconstruction_pydmd
+        ) / np.linalg.norm(reconstruction)
+        threshold = 1e-4
+        assert rel_error < threshold, (
+            "The relative Frobenius error between the SVD-ROM and PyDMD "
+            f"reconstructions is {rel_error:.4f}. The threshold is {threshold:.4f}."
         )
