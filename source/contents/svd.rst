@@ -37,6 +37,9 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
     :param rechunk: If ``True`` and *algorithm* is ``"randomized"``, the input array is rechunked to a single chunk along its smallest dimension before the SVD is computed. Rechunking is always performed when *algorithm* is ``"tsqr"``, regardless of this flag, because TSQR requires chunking along a single axis. Default is ``False``.
     :type rechunk: bool
 
+    .. note::
+        Although rechunking is not a hard requirement for the ``"randomized"`` back-end (unlike ``"tsqr"``), in our experimentation we found that setting ``rechunk=True`` noticeably improved the accuracy of the randomised SVD. Enabling it is therefore recommended when accuracy matters more than the memory savings of preserving the original chunking.
+
     .. rubric:: Attributes
 
     .. py:property:: n_components
