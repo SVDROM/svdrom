@@ -85,6 +85,10 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
         :returns: ``None``. The decomposition is stored on the instance and exposed through :py:attr:`u`, :py:attr:`s`, :py:attr:`v` and :py:attr:`explained_var_ratio`.
         :rtype: None
 
+        .. note::
+            When using the the ``"randomized"`` algorithm, increasing the number of power iterations (via ``n_power_iter``) and the number of oversamples (via ``n_oversamples``) can significantly improve accuracy, at the expense of additional but manageable computational cost.
+            See the SVD demo notebooks in the ``demos`` folder for an example.
+
     .. py:method:: transform(X)
 
         Project an input array onto the fitted right singular vectors, computing :math:`\tilde{\mathbf{X}} = \mathbf{X}\, \mathbf{V}_k^{*\top}`. The input must have the same number of features as the array on which the model was fitted. The returned ``DataArray`` replaces the feature dimension with the ``"components"`` axis.
