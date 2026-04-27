@@ -38,7 +38,8 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
     :type rechunk: bool
 
     .. note::
-        Although rechunking is not a hard requirement for the ``"randomized"`` back-end (unlike ``"tsqr"``), in our experimentation we found that setting ``rechunk=True`` noticeably improved the accuracy of the randomised SVD. Enabling it is therefore recommended when accuracy matters more than the memory savings of preserving the original chunking.
+        Although rechunking is not a hard requirement for the ``"randomized"`` back-end (unlike ``"tsqr"``), in our experimentation we found that setting ``rechunk=True`` noticeably improved the accuracy of the randomised SVD.
+        Enabling it is therefore recommended when accuracy matters more than the computational savings of preserving the original chunking.
 
     .. rubric:: Attributes
 
