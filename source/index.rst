@@ -18,4 +18,5 @@ This is achieved by using scalable implementations of the ROM algorithms, and by
 
    contents/background
    contents/installation
+   contents/svd
    contents/dmd
