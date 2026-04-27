@@ -12,7 +12,8 @@
       "contributions": [
         "review",
         "code",
-        "maintenance"
+        "maintenance",
+        "doc"
       ]
     },
     {
@@ -24,7 +25,8 @@
         "code",
         "maintenance",
         "review",
-        "infra"
+        "infra",
+        "doc"
       ]
     }
   ]
