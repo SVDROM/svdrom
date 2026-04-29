@@ -2,146 +2,203 @@ import dask.array as da
 import numpy as np
 import pytest
 import xarray as xr
-from test_svd import make_dataarray
 
 from svdrom.pod import POD
 
 
-@pytest.fixture()
-def pod_data():
+def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
+    """Make a Dask-backed DataArray with random data of
+    specified matrix type. The matrix type can be one of:
+    - "tall-and-skinny": More samples than features.
+    - "short-and-fat": More features than samples.
+    - "square": Equal number of samples and features.
+
     """
-    Provides an xarray.DataArray with a clear low-rank structure,
-    making it suitable for testing reconstruction.
-    """
-    n_snapshots = 200
-    n_points = 1000
-    n_rank = 10
+    if matrix_type == "tall-and-skinny":
+        n_space, n_time = 10_000, 100
+        space_chunks, time_chunks = -1, int(n_time / 2)
+    elif matrix_type == "short-and-fat":
+        n_space, n_time = 100, 10_000
+        space_chunks, time_chunks = int(n_space / 2), -1
+    elif matrix_type == "square":
+        n_space, n_time = 1_000, 1_000
+        space_chunks, time_chunks = int(n_space / 2), int(n_time / 2)
+    else:
+        msg = (
+            "Matrix type not supported. "
+            "Must be one of: tall-and-skinny, short-and-fat, square."
+        )
+        raise ValueError(msg)
 
-    modes_np = np.random.randn(n_points, n_rank).astype("float32")
-    coeffs_np = np.sin(np.linspace(0, 4 * np.pi, n_snapshots))[:, None] * np.cos(
-        np.linspace(0, np.pi, n_rank)
-    )[None, :].astype("float32")
-    low_rank_data = coeffs_np @ modes_np.T
+    if time_dim_pos == 1:
+        shape = (n_space, n_time)
+        chunks = (space_chunks, time_chunks)
+        dims = ["space", "time"]
+        coords = {"space": np.arange(n_space), "time": np.arange(n_time)}
+    elif time_dim_pos == 0:
+        shape = (n_time, n_space)
+        chunks = (time_chunks, space_chunks)
+        dims = ["time", "space"]
+        coords = {"time": np.arange(n_time), "space": np.arange(n_space)}
+    else:
+        msg = "time_dim_pos must be 0 or 1."
+        raise ValueError(msg)
 
-    noise = (np.random.rand(n_snapshots, n_points).astype("float32") - 0.5) * 0.1
-    data = low_rank_data + noise
+    X = da.random.random(shape, chunks=chunks).astype("float32")
+    return xr.DataArray(X, dims=dims, coords=coords)
 
-    return xr.DataArray(
-        data,
-        dims=["time", "space"],
-        coords={"time": np.arange(n_snapshots), "space": np.arange(n_points)},
+
+@pytest.mark.parametrize("svd_algorithm", ["tsqr", "randomized"])
+def test_pod_basic_attributes_and_aliases(svd_algorithm):
+    """Test basic functionality and property aliases of POD."""
+    n_modes = 10
+    pod = POD(
+        n_modes=n_modes,
+        svd_algorithm=svd_algorithm,
+        compute_energy_ratio=True,
+    )
+
+    expected_attrs = (
+        "modes",
+        "time_coeffs",
+        "energy",
+        "explained_energy_ratio",
+    )
+    for attr in expected_attrs:
+        assert hasattr(pod, attr), f"POD should have attribute '{attr}'."
+
+    X = make_dataarray("tall-and-skinny")
+    pod.fit(X)
+
+    assert isinstance(pod.modes, xr.DataArray)
+    assert isinstance(pod.modes.data, np.ndarray)
+    assert isinstance(pod.time_coeffs, xr.DataArray)
+    assert isinstance(pod.time_coeffs.data, np.ndarray)
+    assert isinstance(pod.energy, np.ndarray)
+    assert isinstance(pod.explained_energy_ratio, np.ndarray)
+
+    assert pod.modes is pod.u
+    assert pod.time_coeffs is pod.v
+    assert pod.explained_energy_ratio is pod.explained_var_ratio
+
+
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat", "square"])
+def test_pod_shapes_and_dims(matrix_type):
+    """Test that POD modes and time coefficients have the correct shapes and dims."""
+    X = make_dataarray(matrix_type, time_dim_pos=1)
+    n_space, n_time = X.shape
+    n_modes = 10
+
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    assert pod.modes.shape == (n_space, n_modes)
+    assert pod.time_coeffs.shape == (n_modes, n_time)
+    assert pod.energy.shape == (n_modes,)
+
+    assert pod.modes.dims == ("space", "components")
+    assert pod.time_coeffs.dims == ("components", "time")
+
+    assert "space" in pod.modes.coords
+    assert "components" in pod.modes.coords
+    assert "time" not in pod.modes.coords
+
+    assert "time" in pod.time_coeffs.coords
+    assert "components" in pod.time_coeffs.coords
+    assert "space" not in pod.time_coeffs.coords
+
+
+def test_time_dimension_handling():
+    """Test that POD correctly handles the time_dimension parameter
+    by transposing if necessary."""
+    X = make_dataarray("short-and-fat", time_dim_pos=0)
+    assert X.dims == ("time", "space")
+    n_time, n_space = X.shape
+    n_modes = 15
+
+    pod = POD(n_modes=n_modes, time_dimension="time")
+    pod.fit(X)
+
+    assert pod.modes.shape == (n_space, n_modes)
+    assert pod.time_coeffs.shape == (n_modes, n_time)
+
+    assert pod.modes.dims == ("space", "components")
+    assert "space" in pod.modes.coords
+    assert pod.time_coeffs.dims == ("components", "time")
+    assert "time" in pod.time_coeffs.coords
+
+
+def test_remove_mean():
+    X = make_dataarray("tall-and-skinny")
+    n_modes = 5
+
+    pod = POD(n_modes=n_modes, remove_mean=True, time_dimension="time")
+    pod.fit(X)
+
+    # (U*S @ V).
+    reconstructed_fluctuations = (pod.modes.data * pod.s) @ pod.time_coeffs.data
+
+    # *The temporal mean of the reconstructed fluctuations should be close to zero
+    mean_of_reconstruction = reconstructed_fluctuations.mean(axis=1)
+    assert np.allclose(mean_of_reconstruction, 0, atol=1e-5)
+
+
+def test_energy_calculation():
+    """Test that the `energy` property is calculated correctly."""
+    X = make_dataarray("square")
+    n_modes = 20
+
+    pod = POD(n_modes=n_modes, compute_energy_ratio=True, remove_mean=True)
+    pod.fit(X)
+
+    n_samples = pod.modes.shape[0]
+    expected_energy = pod.s**2 / n_samples
+    assert np.allclose(pod.energy, expected_energy, atol=1e-6)
+
+    # The total variance is the total energy of the system
+    X_processed = X - X.mean(dim="time")
+    total_variance = (X_processed.data**2).sum().compute() / n_samples
+
+    # The explained energy ratio of each mode should be its energy divided
+    # by the total system energy (total variance)
+    assert np.allclose(
+        pod.explained_energy_ratio,
+        pod.energy / total_variance,
+        rtol=1e-2,
     )
 
 
-def test_pod_initialization():
-    """Test that the POD class initializes correctly."""
-    pod = POD(n_modes=10, algorithm="randomized")
-    assert pod.n_modes == 10
-    assert pod.algorithm == "randomized"
-    assert pod.modes is None
-    assert pod.coeffs is None
-    assert pod.energy is None
-    assert pod.mean_field is None
-    assert pod.s is None
+def test_invalid_time_dimension_error():
+    """Test that a ValueError is raised for a non-existent time dimension."""
+    X = make_dataarray("tall-and-skinny")
+    pod = POD(n_modes=5, time_dimension="non_existent_dim")
+
+    with pytest.raises(ValueError, match="is not a dimension of the input array"):
+        pod.fit(X)
 
 
-@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
-@pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
-def test_pod_fit_attributes_and_shapes(matrix_type, algorithm):
-    """Test the types, shapes, and metadata of POD attributes after fitting."""
-    X = make_dataarray(matrix_type)
-    n_samples, n_features = X.shape
-    time_dim, space_dim = X.dims
-    n_modes = 15
+def test_compute_methods():
+    """Test that the `compute_*` convenience methods work."""
+    n_modes = 5
+    pod = POD(
+        n_modes=n_modes,
+        compute_modes=False,
+        compute_time_coeffs=False,
+        compute_energy_ratio=False,
+    )
 
-    pod = POD(n_modes, algorithm=algorithm)
-    pod.fit(X, dim=time_dim)
+    X = make_dataarray("tall-and-skinny")
+    pod.fit(X)
 
-    assert isinstance(pod.mean_field, xr.DataArray)
-    assert isinstance(pod.modes, xr.DataArray)
-    assert isinstance(pod.coeffs, xr.DataArray)
-    assert isinstance(pod.energy, np.ndarray)
-    assert isinstance(pod.s, np.ndarray)
+    assert isinstance(pod.modes.data, da.Array)
+    assert isinstance(pod.time_coeffs.data, da.Array)
+    assert isinstance(pod.explained_energy_ratio, da.Array)
 
-    assert pod.mean_field.shape == (n_features,)
-    assert pod.modes.shape == (n_features, n_modes)
-    assert pod.coeffs.shape == (n_samples, n_modes)
-    assert pod.energy.shape == (n_modes,)
-    assert pod.s.shape == (n_modes,)
+    pod.compute_modes()
+    assert isinstance(pod.modes.data, np.ndarray)
 
-    assert pod.coeffs.dims == (time_dim, "modes")
-    assert pod.modes.dims == (space_dim, "modes")
-    assert "modes" in pod.coeffs.coords and time_dim in pod.coeffs.coords
-    assert "modes" in pod.modes.coords and space_dim in pod.modes.coords
+    pod.compute_time_coeffs()
+    assert isinstance(pod.time_coeffs.data, np.ndarray)
 
-
-@pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
-def test_pod_calculation_correctness(pod_data, algorithm):
-    """Verify the POD results against the reference NumPy implementation."""
-    X_xr = pod_data.chunk({"time": -1, "space": "auto"})
-    X_np = X_xr.values
-    n_snapshots, n_features = X_np.shape
-    n_modes = 20
-
-    X_mean_np = np.mean(X_np, axis=0)
-    X_fluc_np = X_np - X_mean_np
-    X_scaled_np = X_fluc_np / np.sqrt(n_snapshots)
-    u_np, s_np, vh_np = np.linalg.svd(X_scaled_np, full_matrices=False)
-
-    modes_np = vh_np.T[:, :n_modes]
-    coeffs_np = u_np[:, :n_modes] * s_np[:n_modes]
-
-    svd_kwargs = {}
-    if algorithm == "randomized":
-        svd_kwargs["n_power_iter"] = 8
-
-    pod = POD(n_modes, algorithm=algorithm)
-    pod.fit(X_xr, dim="time")
-
-    rtol = 1e-3
-
-    recon_fluc_pod = pod.coeffs.values @ pod.modes.values.T
-    recon_fluc_np = coeffs_np @ modes_np.T
-
-    assert np.allclose(
-        recon_fluc_pod, recon_fluc_np, rtol=rtol
-    ), "Reconstructed fluctuations from POD do not match the reference NumPy calculation."
-
-
-def test_pod_reconstruction_and_transform(pod_data):
-    """Test data reconstruction and transformation onto the POD basis."""
-    X = pod_data.chunk({"time": -1, "space": "auto"})
-    n_modes = 15
-    pod = POD(n_modes, algorithm="randomized")
-    pod.fit(X, dim="time")
-
-    coeffs_transformed = pod.transform(X)
-    assert isinstance(
-        coeffs_transformed, xr.DataArray
-    ), "Transform result should be a DataArray"
-    assert (
-        coeffs_transformed.shape == pod.coeffs.shape
-    ), "Shape of transformed coeffs should match fitted coeffs"
-
-    assert np.allclose(
-        np.abs(coeffs_transformed.values), np.abs(pod.coeffs.values), rtol=1e-3
-    ), "Transformed coefficients do not match fitted coefficients within tolerance."
-
-    X_reconstructed = pod.reconstruct(n_modes=n_modes)
-    assert isinstance(
-        X_reconstructed, xr.DataArray
-    ), "Reconstruction result should be a DataArray"
-
-    assert (
-        X_reconstructed.dims == X.dims
-    ), f"Expected dims {X.dims} but got {X_reconstructed.dims}"
-    assert (
-        X_reconstructed.shape == X.shape
-    ), "Shape of reconstructed data should match original"
-    assert list(X_reconstructed.coords.keys()) == list(
-        X.coords.keys()
-    ), "Coordinates should match original"
-
-    error = da.linalg.norm(X.data - X_reconstructed.data) / da.linalg.norm(X.data)
-    computed_error = error.compute()
-    assert computed_error < 0.1, f"Reconstruction error {computed_error} was too high."
+    pod.compute_energy_ratio()
+    assert isinstance(pod.explained_energy_ratio, np.ndarray)
