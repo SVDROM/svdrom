@@ -80,8 +80,8 @@ class TestDataHandler:
                 "h5",
                 "dataset.h5",
                 "dataarray.h5",
-                lambda ds, path: ds.to_netcdf(path, engine="h5netcdf"),
-                lambda da, path: da.to_netcdf(path, engine="h5netcdf"),
+                lambda ds, path: ds.to_netcdf(path),
+                lambda da, path: da.to_netcdf(path),
             ),
         ],
     )

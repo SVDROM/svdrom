@@ -7,6 +7,7 @@ repos:
     rev: "v4.6.0"
     hooks:
       - id: check-added-large-files
+        args: ["--maxkb=1000"]
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
@@ -28,7 +29,7 @@ repos:
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.11.1"
+    rev: "v1.17.1"
     hooks:
       - id: mypy
         files: src
@@ -38,4 +39,7 @@ repos:
           - pytest
           - xarray
           - dask
-          - dask-ml
+          - pydmd
+          - pandas
+          - pandas-stubs
+          - weatherbench2 @ git+https://github.com/google-research/weatherbench2.git

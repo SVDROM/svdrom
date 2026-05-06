@@ -42,6 +42,12 @@ Use pytest-cov to generate coverage reports:
 pytest --cov=svdrom
 ```
 
+You can generate a HTML coverage report that you can open in your browser by running:
+
+```bash
+coverage html
+```
+
 # Pre-commit
 
 This project uses pre-commit for all style checking. Install pre-commit and run:
@@ -51,3 +57,10 @@ pre-commit run -a
 ```
 
 to check all files.
+
+
+# Getting started
+
+We are always looking for new contributors for this open source project.
+Have a look at our open issues to find ways in which you can help.
+Reach out to [David on LinkedIn](linkedin.com/in/david-salvador-jasin) for more info.
