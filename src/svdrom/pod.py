@@ -53,6 +53,7 @@ class POD(TruncatedSVD):
 
     @property
     def explained_energy_ratio(self) -> np.ndarray | da.Array | None:
+        """Ratio of total energy (read-only)."""
         return self._explained_var_ratio
 
     def _preprocess_array(self, X: xr.DataArray) -> xr.DataArray:
@@ -78,6 +79,18 @@ class POD(TruncatedSVD):
         X: xr.DataArray,
         **kwargs,
     ) -> "POD":
+        """Fit the POD model to the input array.
+
+        Parameters
+        ----------
+        X: xr.DataArray, shape (n_spatial_points, n_snapshots)
+            The input array to fit the POD model on. The array must
+            be Dask-backed.
+        **kwargs:
+            Additional keyword arguments to pass to the randomized
+            SVD algorithm used as a backend for the POD computation.
+            See dask.array.linalg.svd_compressed for more details.
+        """
         if self._time_dim not in X.dims:
             msg = (
                 f"Specified time dimension '{self._time_dim}' "
@@ -94,6 +107,9 @@ class POD(TruncatedSVD):
         return self
 
     def compute_modes(self) -> None:
+        """Compute the POD spatial modes if they are
+        still a lazy Dask collection.
+        """
         msg = "Computing POD spatial modes..."
         logger.info(msg)
         super().compute_u()
@@ -101,6 +117,9 @@ class POD(TruncatedSVD):
         logger.info(msg)
 
     def compute_energy_ratio(self) -> None:
+        """Compute the ratio of captured total energy if it is
+        still a lazy Dask collection.
+        """
         msg = "Computing the energy ratio..."
         logger.info(msg)
         super().compute_var_ratio()
@@ -108,6 +127,9 @@ class POD(TruncatedSVD):
         logger.info(msg)
 
     def compute_time_coeffs(self) -> None:
+        """Compute the POD time coefficients if they are still a
+        lazy Dask collection.
+        """
         self._check_is_fitted(["_time_coeffs"])
         assert self._time_coeffs is not None
         msg = "Computing the POD time coefficients..."
