@@ -18,7 +18,7 @@ class POD(TruncatedSVD):
         compute_time_coeffs: bool = True,
         compute_energy_ratio: bool = False,
         rechunk: bool = False,
-        remove_mean: bool = False,
+        remove_mean: bool = True,
         time_dimension: str = "time",
     ):
         super().__init__(
@@ -77,7 +77,7 @@ class POD(TruncatedSVD):
         self,
         X: xr.DataArray,
         **kwargs,
-    ) -> None:
+    ) -> "POD":
         if self._time_dim not in X.dims:
             msg = (
                 f"Specified time dimension '{self._time_dim}' "
@@ -86,6 +86,7 @@ class POD(TruncatedSVD):
             raise ValueError(msg)
         X = self._preprocess_array(X)
         super().fit(X, **kwargs)
+        return self
 
     def compute_modes(self) -> None:
         super().compute_u()
