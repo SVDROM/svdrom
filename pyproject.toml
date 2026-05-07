@@ -89,6 +89,10 @@ strict = false
 module = ["pydmd.*", "weatherbench2.*"]
 follow_untyped_imports = true
 
+[[tool.mypy.overrides]]
+module = ["zarr.*"]
+follow_imports = "skip"
+
 [tool.ruff]
 src = ["src"]
 exclude = []
