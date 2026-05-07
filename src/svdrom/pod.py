@@ -30,7 +30,7 @@ class POD(TruncatedSVD):
             rechunk=rechunk,
         )
 
-        self._energy: np.ndarray | None = None
+        self._time_coeffs: xr.DataArray | None = None
         self._remove_mean: bool = remove_mean
         self._time_dim: str = time_dimension
 
@@ -42,13 +42,13 @@ class POD(TruncatedSVD):
     @property
     def time_coeffs(self) -> xr.DataArray | None:
         """Time coefficients (read-only)."""
-        return self._v
+        return self._time_coeffs
 
     @property
     def energy(self) -> np.ndarray | None:
         """Energy (variance) explained by each POD mode (read-only)."""
-        if self._s is not None and self._u is not None:
-            return self._s**2 / self._u.shape[0]
+        if self._s is not None:
+            return self._s**2
         return None
 
     @property
@@ -86,13 +86,32 @@ class POD(TruncatedSVD):
             raise ValueError(msg)
         X = self._preprocess_array(X)
         super().fit(X, **kwargs)
+        assert self._s is not None
+        assert self._v is not None
+        self._time_coeffs = xr.apply_ufunc(
+            np.matmul, np.diag(self._s), self._v, dask="allowed"
+        )
         return self
 
     def compute_modes(self) -> None:
+        msg = "Computing POD spatial modes..."
+        logger.info(msg)
         super().compute_u()
-
-    def compute_time_coeffs(self) -> None:
-        super().compute_v()
+        msg = "Done."
+        logger.info(msg)
 
     def compute_energy_ratio(self) -> None:
+        msg = "Computing the energy ratio..."
+        logger.info(msg)
         super().compute_var_ratio()
+        msg = "Done."
+        logger.info(msg)
+
+    def compute_time_coeffs(self) -> None:
+        self._check_is_fitted(["_time_coeffs"])
+        assert self._time_coeffs is not None
+        msg = "Computing the POD time coefficients..."
+        logger.info(msg)
+        self._time_coeffs = self._time_coeffs.compute()
+        msg = "Done."
+        logger.info(msg)
