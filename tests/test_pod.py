@@ -8,11 +8,24 @@ from svdrom.pod import POD
 
 def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
     """Make a Dask-backed DataArray with random data of
-    specified matrix type. The matrix type can be one of:
-    - "tall-and-skinny": More samples than features.
-    - "short-and-fat": More features than samples.
-    - "square": Equal number of samples and features.
+    specified matrix type.
 
+    Parameters
+    ----------
+    matrix_type: str
+        Can be one of:
+        - "tall-and-skinny": More spatial locations than snapshots.
+        - "short-and-fat": More snapshots than spatial locations.
+        - "square": Equal number of spatial locations and snapshots.
+    time_dim_pos: int
+        Set to 0 if you want the temporal dimension to be along the rows,
+        or set to 1 if you want the temporal dimension to be along the
+        columns. The default is 1.
+
+    Returns
+    -------
+    xr.DataArray
+        A Dask-backed DataArray of random data of the requested characteristics.
     """
     if matrix_type == "tall-and-skinny":
         n_space, n_time = 10_000, 100
