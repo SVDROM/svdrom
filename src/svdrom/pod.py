@@ -61,16 +61,11 @@ class POD(TruncatedSVD):
         is not along the columns. Remove the temporal average if
         requested by the user.
         """
-        dims = X.dims
-        if dims.index(self._time_dim) != 1:
+        if X.dims.index(self._time_dim) != 1:
             X = X.T
         if self._remove_mean:
             scaler = StandardScaler()
-            X = scaler(
-                X,
-                dim=self._time_dim,
-                with_std=False,
-            )
+            X = scaler(X, dim=self._time_dim)
             assert isinstance(X, xr.DataArray), "Expected DataArray after scaling."
         return X
 
