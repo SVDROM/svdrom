@@ -62,8 +62,8 @@ def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
 
 
 @pytest.mark.parametrize("svd_algorithm", ["tsqr", "randomized"])
-def test_pod_basic_attributes_and_aliases(svd_algorithm):
-    """Test basic functionality and property aliases of POD."""
+def test_basic(svd_algorithm):
+    """Test basic functionality of POD."""
     n_modes = 10
     pod = POD(
         n_modes=n_modes,
@@ -83,16 +83,41 @@ def test_pod_basic_attributes_and_aliases(svd_algorithm):
     X = make_dataarray("tall-and-skinny")
     pod.fit(X)
 
-    assert isinstance(pod.modes, xr.DataArray)
-    assert isinstance(pod.modes.data, np.ndarray)
-    assert isinstance(pod.time_coeffs, xr.DataArray)
-    assert isinstance(pod.time_coeffs.data, np.ndarray)
-    assert isinstance(pod.energy, np.ndarray)
-    assert isinstance(pod.explained_energy_ratio, np.ndarray)
+    assert isinstance(
+        pod.modes, xr.DataArray
+    ), f"modes should be an xarray DataArray, got {type(pod.modes)}."
+    assert isinstance(pod.modes.data, np.ndarray), (
+        "modes should be a xarray DataArray with numpy ndarray data, "
+        f"got {type(pod.modes.data)}."
+    )
+    assert isinstance(
+        pod.time_coeffs, xr.DataArray
+    ), f"time_coeffs should be an xarray DataArray, got {type(pod.time_coeffs)}."
+    assert isinstance(pod.time_coeffs.data, np.ndarray), (
+        "time_coeffs should be a xarray DataArray with numpy ndarray data, "
+        f"got {type(pod.time_coeffs.data)}."
+    )
+    assert isinstance(
+        pod.energy, np.ndarray
+    ), f"energy should be a numpy ndarray, got {type(pod.energy)}."
+    assert isinstance(pod.explained_energy_ratio, np.ndarray), (
+        "explained_energy_ratio should be a numpy ndarray, "
+        f"got {type(pod.explained_energy_ratio)}."
+    )
 
-    assert pod.modes is pod.u
-    assert pod.time_coeffs is pod.v
-    assert pod.explained_energy_ratio is pod.explained_var_ratio
+    assert np.array_equal(
+        pod.modes.data, pod.u.data
+    ), "The POD spatial modes should equal the SVD left singular vectors."
+    assert np.array_equal(pod.time_coeffs.data, np.diag(pod.s) @ pod.v.data), (
+        "The POD time coefficients should equal the "
+        "SVD right singular vectors scaled by the singular values."
+    )
+    assert np.array_equal(
+        pod.explained_energy_ratio.data, pod.explained_var_ratio.data
+    ), (
+        "The POD explained energy ratio should equal "
+        "the SVD explained variance ratio."
+    )
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat", "square"])
