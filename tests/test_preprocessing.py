@@ -35,9 +35,9 @@ def test_variable_spatial_stack(X: xr.DataArray | xr.Dataset):
     # check that the dimensions are "time" and stack_coord_name
     dims = sorted(map(str, X_stacked.sizes.keys()))
     expected_dims = sorted(["time", stack_coord_name])
-    assert (
-        dims == expected_dims
-    ), f"Expected dimensions after stacking are {expected_dims}, got {dims}."
+    assert dims == expected_dims, (
+        f"Expected dimensions after stacking are {expected_dims}, got {dims}."
+    )
 
     # check if shape matches expected shape
     X_stacked = X_stacked.transpose(stack_coord_name, "time")
@@ -76,29 +76,29 @@ def test_standard_scaler(X: xr.DataArray | xr.Dataset):
     assert hasattr(scaler, "with_std")
 
     if isinstance(X, xr.DataArray):
-        assert isinstance(
-            X_scaled, xr.DataArray
-        ), f"Expected a DataArray after scaling, got {type(X_scaled).__name__}."
-        assert isinstance(
-            scaler.mean, xr.DataArray
-        ), f"Expected mean to be a DataArray, got {type(scaler.mean).__name__}."
-        assert isinstance(
-            scaler.std, xr.DataArray
-        ), f"Expected std to be a DataArray, got {type(scaler.std).__name__}."
+        assert isinstance(X_scaled, xr.DataArray), (
+            f"Expected a DataArray after scaling, got {type(X_scaled).__name__}."
+        )
+        assert isinstance(scaler.mean, xr.DataArray), (
+            f"Expected mean to be a DataArray, got {type(scaler.mean).__name__}."
+        )
+        assert isinstance(scaler.std, xr.DataArray), (
+            f"Expected std to be a DataArray, got {type(scaler.std).__name__}."
+        )
         if scaler.with_std:
             xr.testing.assert_allclose(X, X_scaled * scaler.std + scaler.mean)
         else:
             xr.testing.assert_allclose(X, X_scaled + scaler.mean)
     if isinstance(X, xr.Dataset):
-        assert isinstance(
-            X_scaled, xr.Dataset
-        ), f"Expected a Dataset after scaling, got {type(X_scaled).__name__}."
-        assert isinstance(
-            scaler.mean, xr.Dataset
-        ), f"Expected mean to be a Dataset, got {type(scaler.mean).__name__}."
-        assert isinstance(
-            scaler.std, xr.Dataset
-        ), f"Expected std to be a Dataset, got {type(scaler.std).__name__}."
+        assert isinstance(X_scaled, xr.Dataset), (
+            f"Expected a Dataset after scaling, got {type(X_scaled).__name__}."
+        )
+        assert isinstance(scaler.mean, xr.Dataset), (
+            f"Expected mean to be a Dataset, got {type(scaler.mean).__name__}."
+        )
+        assert isinstance(scaler.std, xr.Dataset), (
+            f"Expected std to be a Dataset, got {type(scaler.std).__name__}."
+        )
         if scaler.with_std:
             xr.testing.assert_allclose(X, X_scaled * scaler.std + scaler.mean)
         else:
@@ -123,22 +123,22 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
     n_samples, n_snapshots = X.shape
     X_delayed = hankel_preprocessing(X, d=d)
 
-    assert (
-        X_delayed.dims == X.dims
-    ), f"Expected dimensions are {X.dims}, but got {X_delayed.dims}."
+    assert X_delayed.dims == X.dims, (
+        f"Expected dimensions are {X.dims}, but got {X_delayed.dims}."
+    )
 
     expected_coords = list(X.coords)
     expected_coords.append(hankel_coord_name)
     actual_coords = list(X_delayed.coords)
     expected_coords, actual_coords = sorted(expected_coords), sorted(actual_coords)
-    assert (
-        actual_coords == expected_coords
-    ), f"Expected coordinates are {expected_coords}, but got {actual_coords}."
+    assert actual_coords == expected_coords, (
+        f"Expected coordinates are {expected_coords}, but got {actual_coords}."
+    )
 
     expected_shape = (d * n_samples, n_snapshots - d + 1)
-    assert (
-        X_delayed.shape == expected_shape
-    ), f"Expected shape is {expected_shape}, but got {X_delayed.shape}."
+    assert X_delayed.shape == expected_shape, (
+        f"Expected shape is {expected_shape}, but got {X_delayed.shape}."
+    )
 
     expected_lag_coord = np.repeat(np.arange(d), n_samples)
     assert np.array_equal(X_delayed[hankel_coord_name].values, expected_lag_coord), (
@@ -151,7 +151,7 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         X_delayed.time.values,
         expected_time_coord,
     ), (
-        f"Expected the time coordinate to be equal to t[:{-d+1}], "
+        f"Expected the time coordinate to be equal to t[:{-d + 1}], "
         "where t is the time coordinate of the original matrix."
     )
 
@@ -190,5 +190,5 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         X_delayed[:n_samples, d - 1].compute().data,
     ), (
         "After Hankel pre-processing, expected "
-        f"X[{(d-1) * n_samples}:, 0] to equal X[:{n_samples}, {d-1}]."
+        f"X[{(d - 1) * n_samples}:, 0] to equal X[:{n_samples}, {d - 1}]."
     )

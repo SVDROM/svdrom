@@ -25,55 +25,55 @@ class BaseTestOptDMD:
     def test_basic(self, solver):
         """Basic test to check attributes of the OptDMD class."""
         solver = getattr(self, solver)
-        assert hasattr(
-            solver, "modes"
-        ), "OptDMD object is missing the 'modes' attribute."
+        assert hasattr(solver, "modes"), (
+            "OptDMD object is missing the 'modes' attribute."
+        )
         assert hasattr(solver, "eigs"), "OptDMD object is missing the 'eigs' attribute."
-        assert hasattr(
-            solver, "amplitudes"
-        ), "OptDMD object is missing the 'amplitudes' attribute."
-        assert hasattr(
-            solver, "modes_std"
-        ), "OptDMD object is missing the 'modes_std' attribute."
-        assert hasattr(
-            solver, "eigs_std"
-        ), "OptDMD object is missing the 'eigs_std' attribute."
-        assert hasattr(
-            solver, "amplitudes_std"
-        ), "OptDMD object is missing the 'amplitudes_std' attribute."
-        assert hasattr(
-            solver, "time_fit"
-        ), "OptDMD object is missing the 'time_fit' attribute."
-        assert hasattr(
-            solver, "time_fit_original"
-        ), "OptDMD object is missing the 'time_fit_original' attribute."
-        assert hasattr(
-            solver, "num_trials"
-        ), "OptDMD object is missing the 'num_trials' attribute."
-        assert hasattr(
-            solver, "trial_size"
-        ), "OptDMD object is missing the 'trial_size' attribute."
-        assert hasattr(
-            solver, "parallel_bagging"
-        ), "OptDMD object is missing the 'parallel_bagging' attribute."
-        assert hasattr(
-            solver, "dynamics"
-        ), "OptDMD object is missing the 'dynamics' attribute."
-        assert hasattr(
-            solver, "time_units"
-        ), "OptDMD object is missing the 'time_units' attribute."
-        assert hasattr(
-            solver, "input_time_units"
-        ), "OptDMD object is missing the 'input_time_units' attribute."
-        assert hasattr(
-            solver, "hankel_d"
-        ), "OptDMD object is missing the 'hankel_d' attribute."
-        assert hasattr(
-            solver, "modes_averaged"
-        ), "OptDMD object is missing the 'modes_averaged' attribute."
-        assert hasattr(
-            solver, "modes_std_averaged"
-        ), "OptDMD object is missing the 'modes_std_averaged' attribute."
+        assert hasattr(solver, "amplitudes"), (
+            "OptDMD object is missing the 'amplitudes' attribute."
+        )
+        assert hasattr(solver, "modes_std"), (
+            "OptDMD object is missing the 'modes_std' attribute."
+        )
+        assert hasattr(solver, "eigs_std"), (
+            "OptDMD object is missing the 'eigs_std' attribute."
+        )
+        assert hasattr(solver, "amplitudes_std"), (
+            "OptDMD object is missing the 'amplitudes_std' attribute."
+        )
+        assert hasattr(solver, "time_fit"), (
+            "OptDMD object is missing the 'time_fit' attribute."
+        )
+        assert hasattr(solver, "time_fit_original"), (
+            "OptDMD object is missing the 'time_fit_original' attribute."
+        )
+        assert hasattr(solver, "num_trials"), (
+            "OptDMD object is missing the 'num_trials' attribute."
+        )
+        assert hasattr(solver, "trial_size"), (
+            "OptDMD object is missing the 'trial_size' attribute."
+        )
+        assert hasattr(solver, "parallel_bagging"), (
+            "OptDMD object is missing the 'parallel_bagging' attribute."
+        )
+        assert hasattr(solver, "dynamics"), (
+            "OptDMD object is missing the 'dynamics' attribute."
+        )
+        assert hasattr(solver, "time_units"), (
+            "OptDMD object is missing the 'time_units' attribute."
+        )
+        assert hasattr(solver, "input_time_units"), (
+            "OptDMD object is missing the 'input_time_units' attribute."
+        )
+        assert hasattr(solver, "hankel_d"), (
+            "OptDMD object is missing the 'hankel_d' attribute."
+        )
+        assert hasattr(solver, "modes_averaged"), (
+            "OptDMD object is missing the 'modes_averaged' attribute."
+        )
+        assert hasattr(solver, "modes_std_averaged"), (
+            "OptDMD object is missing the 'modes_std_averaged' attribute."
+        )
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_fit_basic(self, solver):
@@ -108,9 +108,9 @@ class BaseTestOptDMD:
             "Expected 'time_fit' to be of type 'np.ndarray', "
             f"but got {type(solver.time_fit)} instead."
         )
-        assert np.array_equal(
-            solver.time_fit, self.v.time.values
-        ), "Expected 'time_fit' vector to be strictly equal to 'v.time.values'."
+        assert np.array_equal(solver.time_fit, self.v.time.values), (
+            "Expected 'time_fit' vector to be strictly equal to 'v.time.values'."
+        )
         if self.hankel_preprocessing:
             assert isinstance(solver.time_fit_original, np.ndarray), (
                 "Expected 'time_fit_original' to be of type 'np.ndarray', "
@@ -160,11 +160,10 @@ class BaseTestOptDMD:
         if solver.num_trials == 0:
             # no bagging
             assert solver.modes_std is None, (
-                "Expected 'modes_std' to be None, "
-                f"but got {solver.modes_std} instead."
+                f"Expected 'modes_std' to be None, but got {solver.modes_std} instead."
             )
             assert solver.eigs_std is None, (
-                "Expected 'eigs_std' to be None, " f"but got {solver.eigs_std} instead."
+                f"Expected 'eigs_std' to be None, but got {solver.eigs_std} instead."
             )
             assert solver.amplitudes_std is None, (
                 "Expected 'amplitudes_std' to be None, "
@@ -730,12 +729,11 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
             expected_t_hankel = t - self.d + 1
             expected_lag = self.d - 1
         assert t_hankel == expected_t_hankel, (
-            f"Expected t_hankel to be {expected_t_hankel}, "
-            f"but got {t_hankel} instead."
+            f"Expected t_hankel to be {expected_t_hankel}, but got {t_hankel} instead."
         )
-        assert (
-            lag == expected_lag
-        ), f"Expected lag to be {expected_lag}, but got {lag} instead."
+        assert lag == expected_lag, (
+            f"Expected lag to be {expected_lag}, but got {lag} instead."
+        )
 
     def test_reconstruct_vs_pydmd(self):
         """Test that the reconstruct() method gives a similar result

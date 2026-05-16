@@ -17,7 +17,7 @@ from svdrom.weather_utils import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def data_generator() -> Callable:
     """Generate random prediction and groundtruth DataArrays for testing."""
 
@@ -60,7 +60,7 @@ def data_generator() -> Callable:
     return _factory
 
 
-@pytest.fixture()
+@pytest.fixture
 def probabilistic_prediction_generator(
     data_generator,
 ) -> tuple[xr.DataArray, xr.DataArray]:
@@ -230,9 +230,9 @@ def test_compute_energy_spectrum(data_generator):
         f"Expected dimensions of spectrum to be {expected_dims}, "
         f"but got {spectrum.dims}."
     )
-    assert (
-        "wavelength" in spectrum.coords
-    ), "Expected wavelength to be a coordinate of spectrum."
+    assert "wavelength" in spectrum.coords, (
+        "Expected wavelength to be a coordinate of spectrum."
+    )
 
 
 @pytest.mark.parametrize("dims", [("latitude", "longitude"), "time", None])
@@ -287,12 +287,12 @@ def test_compute_acc(data_generator):
         climatology=climatology,
     )
     acc = acc.squeeze()
-    assert acc.dims == (
-        "time",
-    ), f"Expected dimensions of ACC to be ('time',), but got {acc.dims}."
-    assert (
-        acc.time.values == ground_truth.time.values
-    ).all(), "Expected time coordinates of ACC to match those of ground truth."
+    assert acc.dims == ("time",), (
+        f"Expected dimensions of ACC to be ('time',), but got {acc.dims}."
+    )
+    assert (acc.time.values == ground_truth.time.values).all(), (
+        "Expected time coordinates of ACC to match those of ground truth."
+    )
 
     assert np.abs(acc.values.mean()) < 0.05, (
         "Expected mean ACC to be close to 0 for random predictions, "

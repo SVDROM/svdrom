@@ -216,7 +216,8 @@ def test_reconstruct(matrix_type):
         f"got {type(X_r.data)}."
     )
     assert X_r.shape == (tsvd.u.shape[0],), (
-        f"Reconstructed snapshot should have shape ({tsvd.u.shape[0]}), got {X_r.shape}."
+        "Reconstructed snapshot should have shape "
+        f"({tsvd.u.shape[0]}), got {X_r.shape}."
     )
     assert samples_coord_name in X_r.dims, (
         f"Reconstructed snapshot should have dimension {samples_coord_name}."

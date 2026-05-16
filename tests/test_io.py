@@ -94,16 +94,16 @@ class TestDataHandler:
         ds = open_dataset(ds_path)
         da = open_dataarray(da_path)
 
-        assert isinstance(
-            ds, xr.Dataset
-        ), f"Expected xarray.Dataset, got {type(ds).__name__}."
-        assert isinstance(
-            da, xr.DataArray
-        ), f"Expected xarray.DataArray, got {type(da).__name__}."
+        assert isinstance(ds, xr.Dataset), (
+            f"Expected xarray.Dataset, got {type(ds).__name__}."
+        )
+        assert isinstance(da, xr.DataArray), (
+            f"Expected xarray.DataArray, got {type(da).__name__}."
+        )
 
-        assert self.data_generator.ds.equals(
-            ds
-        ), f"Xarray Datasets should be equal for {filetype}."
-        assert self.data_generator.da.equals(
-            da
-        ), f"Xarray DataArrays should be equal for {filetype}."
+        assert self.data_generator.ds.equals(ds), (
+            f"Xarray Datasets should be equal for {filetype}."
+        )
+        assert self.data_generator.da.equals(da), (
+            f"Xarray DataArrays should be equal for {filetype}."
+        )
