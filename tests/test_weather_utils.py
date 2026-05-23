@@ -222,6 +222,10 @@ def test_expand_time_climatology(doy, year, data_generator):
 
 def test_compute_energy_spectrum(data_generator):
     """Test for the compute_energy_spectrum() function."""
+    pytest.importorskip(
+        "weatherbench2.derived_variables",
+        reason="compute_energy_spectrum() requires the extras dependencies.",
+    )
     prediction, _ = data_generator()
     spectrum = compute_energy_spectrum(prediction)
     expected_dims = ("time", "frequency", "level")
@@ -244,6 +248,10 @@ def test_compute_crps_gaussian(
     lat_weighting,
 ):
     """Test for the compute_crps_gaussian() function."""
+    pytest.importorskip(
+        "properscoring",
+        reason="compute_crps_gaussian() requires the extras dependencies.",
+    )
     _, groundtruth = data_generator()
     prediction_mean, prediction_std = probabilistic_prediction_generator
 
