@@ -36,9 +36,11 @@ repos:
         args: []
         # because pre-commit runs mypy from an isolated environment, we need to add typed dependencies here
         additional_dependencies:
+          - importlib_metadata
           - pytest
           - xarray
           - dask
+          - zarr<3
           - pydmd
           - pandas
           - pandas-stubs
