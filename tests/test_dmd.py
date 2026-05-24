@@ -159,13 +159,12 @@ class BaseTestOptDMD:
         )
         if solver.num_trials == 0:
             # no bagging
-            assert solver.modes_std is None, (
-                "Expected 'modes_std' to be None, "
-                f"but got {solver.modes_std} instead."
-            )
-            assert solver.eigs_std is None, (
-                "Expected 'eigs_std' to be None, " f"but got {solver.eigs_std} instead."
-            )
+            assert (
+                solver.modes_std is None
+            ), f"Expected 'modes_std' to be None, but got {solver.modes_std} instead."
+            assert (
+                solver.eigs_std is None
+            ), f"Expected 'eigs_std' to be None, but got {solver.eigs_std} instead."
             assert solver.amplitudes_std is None, (
                 "Expected 'amplitudes_std' to be None, "
                 f"but got {solver.amplitudes_std} instead."
@@ -729,10 +728,9 @@ class TestOptDMDHankelMatrix(TestOptDMDCoherentSignal):
         else:
             expected_t_hankel = t - self.d + 1
             expected_lag = self.d - 1
-        assert t_hankel == expected_t_hankel, (
-            f"Expected t_hankel to be {expected_t_hankel}, "
-            f"but got {t_hankel} instead."
-        )
+        assert (
+            t_hankel == expected_t_hankel
+        ), f"Expected t_hankel to be {expected_t_hankel}, but got {t_hankel} instead."
         assert (
             lag == expected_lag
         ), f"Expected lag to be {expected_lag}, but got {lag} instead."
