@@ -40,7 +40,7 @@ repos:
           - pytest
           - xarray
           - dask
-          - zarr<3
+          - zarr<=3.1.0
           - pydmd
           - pandas
           - pandas-stubs
