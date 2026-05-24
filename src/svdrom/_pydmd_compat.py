@@ -22,7 +22,7 @@ def precompile_pydmd(*, force: bool = False) -> None:
     env = os.environ.copy()
     env["PYTHONWARNINGS"] = "default"
 
-    try:
+    with contextlib.suppress(OSError):
         subprocess.run(
             [sys.executable, "-c", "import pydmd"],
             check=False,
@@ -30,5 +30,3 @@ def precompile_pydmd(*, force: bool = False) -> None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-    except OSError:
-        contextlib.suppress(OSError)
