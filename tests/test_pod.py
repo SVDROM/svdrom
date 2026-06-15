@@ -113,6 +113,9 @@ def test_basic(svd_algorithm):
         "SVD right singular vectors scaled by the singular values."
     )
     assert np.array_equal(
+        pod.energy, pod._s**2
+    ), "The POD energy should equal the square of the SVD singular values."
+    assert np.array_equal(
         pod.explained_energy_ratio.data, pod.explained_var_ratio.data
     ), (
         "The POD explained energy ratio should equal "
