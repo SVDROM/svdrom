@@ -69,7 +69,7 @@ class POD(TruncatedSVD):
             scaler = StandardScaler()
             X = scaler(X, dim=self._time_dim)
             assert isinstance(X, xr.DataArray), "Expected DataArray after scaling."
-        n_snapshots = len(X.coords[self._time_dim])
+        n_snapshots = X.sizes[self._time_dim]
         X = X / n_snapshots ** 0.5
         return X
 

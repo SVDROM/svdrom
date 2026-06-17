@@ -188,7 +188,7 @@ def test_time_dimension_handling():
     X = make_dataarray("short-and-fat", time_dim_pos=0)
     assert X.dims == ("time", "space")
     n_time, n_space = X.shape
-    n_modes = 10
+    n_modes = N_MODES
 
     pod = POD(n_modes=n_modes, time_dimension="time")
     pod.fit(X)
@@ -209,7 +209,7 @@ def test_time_dimension_handling():
 
 def test_remove_mean():
     X = make_dataarray("tall-and-skinny")
-    n_modes = 10
+    n_modes = N_MODES
 
     pod = POD(n_modes=n_modes)
     pod.fit(X)
@@ -226,28 +226,21 @@ def test_remove_mean():
 
 
 def test_energy_calculation():
-    """Test that the 'energy' property is calculated correctly."""
-    X = make_dataarray("square")
-    n_modes = 20
+    """Test that the 'energy' property returns the eigenvalues of the
+    spatial covariance matrix, computed via the snapshot method."""
+    X = make_dataarray("tall-and-skinny", time_dim_pos=1)
+    n_snapshots = X.sizes["time"]
+    n_modes = N_MODES
 
-    pod = POD(n_modes=n_modes, compute_energy_ratio=True, remove_mean=True)
+    pod = POD(n_modes=n_modes, svd_algorithm="tsqr")
     pod.fit(X)
+    assert pod.energy is not None
 
-    n_samples = pod.modes.shape[0]
-    expected_energy = pod.s**2 / n_samples
-    assert np.allclose(pod.energy, expected_energy, atol=1e-6)
+    X_fluc = (X - X.mean(dim="time")).values  # (n_space, n_time)
+    T = X_fluc.T @ X_fluc / n_snapshots  # (n_time, n_time) temporal correlation
+    ref_eigenvalues = np.sort(np.linalg.eigvalsh(T))[::-1][:n_modes]
 
-    # The total variance is the total energy of the system
-    X_processed = X - X.mean(dim="time")
-    total_variance = (X_processed.data**2).sum().compute() / n_samples
-
-    # The explained energy ratio of each mode should be its energy divided
-    # by the total system energy (total variance)
-    assert np.allclose(
-        pod.explained_energy_ratio,
-        pod.energy / total_variance,
-        rtol=1e-2,
-    )
+    assert np.allclose(pod.energy, ref_eigenvalues, rtol=1e-3)
 
 
 def test_invalid_time_dimension_error():
