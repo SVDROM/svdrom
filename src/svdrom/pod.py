@@ -59,7 +59,9 @@ class POD(TruncatedSVD):
     def _preprocess_array(self, X: xr.DataArray) -> xr.DataArray:
         """Transpose the array if the user-specified time dimension
         is not along the columns. Remove the temporal average if
-        requested by the user.
+        requested by the user. Also scale by the square root of the number
+        of snapshots, so that modal energy is independent of the number
+        of snapshots. 
         """
         if X.dims.index(self._time_dim) != 1:
             X = X.T
@@ -67,6 +69,8 @@ class POD(TruncatedSVD):
             scaler = StandardScaler()
             X = scaler(X, dim=self._time_dim)
             assert isinstance(X, xr.DataArray), "Expected DataArray after scaling."
+        n_snapshots = len(X.coords[self._time_dim])
+        X = X / n_snapshots ** 0.5
         return X
 
     def fit(
