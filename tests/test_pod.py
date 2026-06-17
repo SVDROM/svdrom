@@ -5,6 +5,8 @@ import xarray as xr
 
 from svdrom.pod import POD
 
+N_MODES = 10
+
 
 def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
     """Make a Dask-backed DataArray with random data of
@@ -63,8 +65,10 @@ def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
 
 @pytest.mark.parametrize("svd_algorithm", ["tsqr", "randomized"])
 def test_basic(svd_algorithm):
-    """Test basic functionality of POD."""
-    n_modes = 10
+    """Test basic functionality of POD, using the two backend
+    SVD algorithms.
+    """
+    n_modes = N_MODES
     pod = POD(
         n_modes=n_modes,
         svd_algorithm=svd_algorithm,
@@ -126,12 +130,16 @@ def test_basic(svd_algorithm):
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat", "square"])
 def test_pod_shapes_and_dims(matrix_type):
     """Test that POD modes and time coefficients have the correct shapes and dims."""
-    X = make_dataarray(matrix_type, time_dim_pos=1)
+    X = make_dataarray(matrix_type)
     n_space, n_time = X.shape
-    n_modes = 10
+    n_modes = N_MODES
 
     pod = POD(n_modes=n_modes)
     pod.fit(X)
+
+    assert pod.modes is not None
+    assert pod.time_coeffs is not None
+    assert pod.energy is not None
 
     assert pod.modes.shape == (n_space, n_modes)
     assert pod.time_coeffs.shape == (n_modes, n_time)
@@ -149,43 +157,76 @@ def test_pod_shapes_and_dims(matrix_type):
     assert "space" not in pod.time_coeffs.coords
 
 
+@pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
+def test_orthogonality(algorithm):
+    """Test orthogonality of POD modes and time coefficients."""
+    X = make_dataarray("tall-and-skinny")
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes, svd_algorithm=algorithm)
+    pod.fit(X)
+
+    assert pod.modes is not None
+    assert pod.time_coeffs is not None
+    assert pod.energy is not None
+
+    identity_k = np.eye(pod.n_components, dtype=np.float32)
+    modes, time_coeffs = pod.modes.data, pod.time_coeffs.data
+    modes_ortho = modes.T @ modes
+    time_coeffs_ortho = time_coeffs @ time_coeffs.T
+
+    assert np.allclose(
+        modes_ortho, identity_k, atol=1e-4
+    ), "modes.T @ modes is not close to identity."
+    assert np.allclose(
+        time_coeffs_ortho, np.diag(pod.energy), atol=1e-4
+    ), "time_coeffs @ time_coeffs.T is not close to np.diag(energy)"
+
+
 def test_time_dimension_handling():
     """Test that POD correctly handles the time_dimension parameter
     by transposing if necessary."""
     X = make_dataarray("short-and-fat", time_dim_pos=0)
     assert X.dims == ("time", "space")
     n_time, n_space = X.shape
-    n_modes = 15
+    n_modes = 10
 
     pod = POD(n_modes=n_modes, time_dimension="time")
     pod.fit(X)
+
+    assert pod.modes is not None
+    assert pod.time_coeffs is not None
 
     assert pod.modes.shape == (n_space, n_modes)
     assert pod.time_coeffs.shape == (n_modes, n_time)
 
     assert pod.modes.dims == ("space", "components")
     assert "space" in pod.modes.coords
+    assert "time" not in pod.modes.coords
     assert pod.time_coeffs.dims == ("components", "time")
     assert "time" in pod.time_coeffs.coords
+    assert "space" not in pod.time_coeffs.coords
 
 
 def test_remove_mean():
     X = make_dataarray("tall-and-skinny")
-    n_modes = 5
+    n_modes = 10
 
-    pod = POD(n_modes=n_modes, remove_mean=True, time_dimension="time")
+    pod = POD(n_modes=n_modes)
     pod.fit(X)
 
-    # (U*S @ V).
-    reconstructed_fluctuations = (pod.modes.data * pod.s) @ pod.time_coeffs.data
+    assert pod.modes is not None
+    assert pod.time_coeffs is not None
 
-    # *The temporal mean of the reconstructed fluctuations should be close to zero
-    mean_of_reconstruction = reconstructed_fluctuations.mean(axis=1)
-    assert np.allclose(mean_of_reconstruction, 0, atol=1e-5)
+    reconstructed_fluctuations = pod.modes @ pod.time_coeffs
+
+    mean_of_reconstruction = reconstructed_fluctuations.mean("time")
+    assert np.allclose(
+        mean_of_reconstruction, 0, atol=1e-5
+    ), "Expected the mean of the reconstructed fluctuations to be close to zero"
 
 
 def test_energy_calculation():
-    """Test that the `energy` property is calculated correctly."""
+    """Test that the 'energy' property is calculated correctly."""
     X = make_dataarray("square")
     n_modes = 20
 
