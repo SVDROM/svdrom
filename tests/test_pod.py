@@ -252,6 +252,57 @@ def test_invalid_time_dimension_error():
         pod.fit(X)
 
 
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
+def test_transform(matrix_type):
+    """Test the inherited transform method on a POD model."""
+    X = make_dataarray(matrix_type)
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    # Remove mean from X the same way POD does internally
+    X_centered = X - X.mean(dim="time")
+    if X_centered.dims.index("time") != 1:
+        X_centered = X_centered.T
+
+    X_t = pod.transform(X_centered)
+    assert isinstance(
+        X_t, xr.DataArray
+    ), "Transformed data should be an xarray DataArray."
+    assert isinstance(
+        X_t.data, np.ndarray
+    ), f"Transformed data should have numpy ndarray as data, got {type(X_t.data)}."
+    assert X_t.shape == (X_centered.shape[0], n_modes), (
+        f"Transformed data should have shape ({X_centered.shape[0]}, {n_modes}), "
+        f"but got {X_t.shape}."
+    )
+
+
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
+def test_reconstruct(matrix_type):
+    """Test the inherited reconstruct method on a POD model."""
+    X = make_dataarray(matrix_type)
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    X_r = pod.reconstruct(0)
+    assert isinstance(
+        X_r, xr.DataArray
+    ), f"Reconstructed snapshot should be an xarray DataArray, got {type(X_r)}."
+    assert isinstance(X_r.data, np.ndarray), (
+        "Reconstructed snapshot should have numpy ndarray as data, "
+        f"got {type(X_r.data)}."
+    )
+    assert X_r.shape == (pod.modes.shape[0],), (
+        f"Reconstructed snapshot should have shape ({pod.modes.shape[0]},), "
+        f"got {X_r.shape}."
+    )
+    assert (
+        "space" in X_r.dims
+    ), "Reconstructed snapshot should have the spatial dimension."
+
+
 def test_compute_methods():
     """Test that the `compute_*` convenience methods work."""
     n_modes = 5
