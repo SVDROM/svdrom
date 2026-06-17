@@ -61,7 +61,7 @@ class POD(TruncatedSVD):
         is not along the columns. Remove the temporal average if
         requested by the user. Also scale by the square root of the number
         of snapshots, so that modal energy is independent of the number
-        of snapshots. 
+        of snapshots.
         """
         if X.dims.index(self._time_dim) != 1:
             X = X.T
@@ -70,8 +70,7 @@ class POD(TruncatedSVD):
             X = scaler(X, dim=self._time_dim)
             assert isinstance(X, xr.DataArray), "Expected DataArray after scaling."
         n_snapshots = X.sizes[self._time_dim]
-        X = X / n_snapshots ** 0.5
-        return X
+        return X / n_snapshots**0.5
 
     def fit(
         self,
