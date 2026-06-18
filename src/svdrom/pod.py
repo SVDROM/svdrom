@@ -143,6 +143,94 @@ class POD(TruncatedSVD):
         msg = "Done."
         logger.info(msg)
 
+    def extended_pod(
+        self,
+        C: xr.DataArray,
+        remove_mean: bool = True,
+        compute: bool = True,
+    ) -> xr.DataArray:
+        """Compute the extended POD modes as proposed by Boree (2003).
+
+        Extended POD finds the correlation between the pre-computed POD
+        modes (e.g. from velocity fields) and another quantity measured
+        simultaneously in time, such as temperature or pressure.
+
+        The extended POD modes are given by:
+
+            chi_j = (1 / (lambda_j * N)) * sum_i(a_ij * c_i')
+
+        where N is the number of snapshots, lambda_j is the energy of
+        the j-th POD mode, a_ij are the time coefficients of the j-th
+        POD mode, and c_i' is the fluctuating part of the simultaneously
+        measured quantity.
+
+        Parameters
+        ----------
+        C : xr.DataArray
+            The simultaneously measured spatio-temporal field. Must have
+            the same time dimension (with matching size) as the array on
+            which POD was fitted, but may have a different spatial
+            dimension (different number of spatial points). Must be
+            Dask-backed.
+        remove_mean : bool, default True
+            Whether to remove the temporal mean from C before computing
+            the extended POD modes. Set to False if C is already a
+            fluctuating quantity.
+        compute : bool, default True
+            If True, eagerly compute and return a NumPy-backed DataArray.
+            If False, return a lazy Dask-backed DataArray.
+
+        Returns
+        -------
+        xr.DataArray
+            The extended POD modes with shape (n_space_C, n_modes),
+            returned in the same format as the POD spatial modes.
+        """
+        self._check_is_fitted(["_time_coeffs", "_s", "_scale_factor"])
+        assert self._time_coeffs is not None
+        assert self._s is not None
+        assert self._scale_factor is not None
+
+        if self._time_dim not in C.dims:
+            msg = (
+                f"Specified time dimension '{self._time_dim}' "
+                "is not a dimension of the input array."
+            )
+            raise ValueError(msg)
+
+        if C.dims.index(self._time_dim) != 1:
+            C = C.T
+
+        n_snapshots = C.sizes[self._time_dim]
+        expected_n_snapshots = self._time_coeffs.sizes[self._time_dim]
+        if n_snapshots != expected_n_snapshots:
+            msg = (
+                f"Number of snapshots in input array ({n_snapshots}) does not "
+                f"match the number used during fit ({expected_n_snapshots})."
+            )
+            raise ValueError(msg)
+
+        C_prime = C - C.mean(dim=self._time_dim) if remove_mean else C
+
+        energy = self._s**2
+        # Extended POD: chi = (1 / scale_factor) * C' @ A^T @ Lambda^{-1}
+        chi = C_prime @ self._time_coeffs.T / (self._scale_factor * energy)
+
+        space_dim = next(d for d in C.dims if d != self._time_dim)
+        chi = xr.DataArray(
+            chi.data,
+            dims=[space_dim, "components"],
+            coords={
+                space_dim: C.coords[space_dim],
+                "components": np.arange(self._n_components),
+            },
+        )
+
+        if compute:
+            chi = chi.compute()
+
+        return chi
+
     def transform(self, X: xr.DataArray, compute: bool = True) -> xr.DataArray:
         """Transform the input array by projecting onto the computed POD modes.
 
