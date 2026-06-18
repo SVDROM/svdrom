@@ -33,6 +33,8 @@ class POD(TruncatedSVD):
         self._time_coeffs: xr.DataArray | None = None
         self._remove_mean: bool = remove_mean
         self._time_dim: str = time_dimension
+        self._mean: xr.DataArray | None = None
+        self._scale_factor: float | None = None
 
     @property
     def modes(self) -> xr.DataArray | None:
@@ -69,8 +71,10 @@ class POD(TruncatedSVD):
             scaler = StandardScaler()
             X = scaler(X, dim=self._time_dim)
             assert isinstance(X, xr.DataArray), "Expected DataArray after scaling."
+            self._mean = scaler._mean
         n_snapshots = X.sizes[self._time_dim]
-        return X / n_snapshots**0.5
+        self._scale_factor = n_snapshots**0.5
+        return X / self._scale_factor
 
     def fit(
         self,
@@ -135,3 +139,60 @@ class POD(TruncatedSVD):
         self._time_coeffs = self._time_coeffs.compute()
         msg = "Done."
         logger.info(msg)
+
+    def transform(self, X: xr.DataArray, compute: bool = True) -> xr.DataArray:
+        """Transform the input array by projecting onto the computed POD modes.
+
+        The same preprocessing applied during fit() (mean removal and
+        scaling) is automatically applied to the input array before
+        projection. The input array is automatically transposed if
+        needed to ensure the time dimension is along the columns.
+
+        Parameters
+        ----------
+        X: xr.DataArray, shape (n_space, n_snapshots) or (n_snapshots, n_space)
+            The array to be transformed. Must have the same spatial
+            dimension (number of spatial points) as the original array
+            on which POD was fitted. Do not remove the mean from the
+            array before calling this method, as the mean of the training
+            data will be subtracted automatically.
+        compute: bool, default True
+            If True, eagerly compute and return a NumPy-backed DataArray.
+            If False, return a lazy Dask-backed DataArray without triggering
+            computation.
+
+        Returns
+        -------
+        xr.DataArray: The temporal coefficients resulting from projecting
+        the input array onto the pre-computed POD modes. Shape is
+        (n_modes, n_snapshots).
+        """
+        self._check_is_fitted(["_u"])
+        assert self._u is not None  # needed for mypy checks
+
+        # Apply same preprocessing as during fit()
+        if X.dims.index(self._time_dim) != 1:
+            X = X.T
+        if self._remove_mean:
+            self._check_is_fitted(["_mean"])
+            assert self._mean is not None  # needed for mypy checks
+            X = X - self._mean
+        assert self._scale_factor is not None
+        X = X / self._scale_factor
+
+        # Project onto POD modes (proper POD projection)
+        if compute:
+            result = (self._u.T @ X).compute()
+        else:
+            # Ensure lazy computation by using Dask-backed u
+            if isinstance(self._u.data, np.ndarray):
+                u_lazy = xr.DataArray(
+                    da.from_array(self._u.data),
+                    dims=self._u.dims,
+                    coords=self._u.coords,
+                )
+                result = u_lazy.T @ X
+            else:
+                result = self._u.T @ X
+
+        return result

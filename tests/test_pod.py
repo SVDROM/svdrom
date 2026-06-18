@@ -254,28 +254,54 @@ def test_invalid_time_dimension_error():
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
 def test_transform(matrix_type):
-    """Test the inherited transform method on a POD model."""
+    """Test the transform method projects data onto POD modes correctly."""
     X = make_dataarray(matrix_type)
     n_modes = N_MODES
+    n_time = X.sizes["time"]
     pod = POD(n_modes=n_modes)
     pod.fit(X)
 
-    # Remove mean from X the same way POD does internally
-    X_centered = X - X.mean(dim="time")
-    if X_centered.dims.index("time") != 1:
-        X_centered = X_centered.T
-
-    X_t = pod.transform(X_centered)
+    # Transform projects onto modes: modes.T @ X -> shape (n_modes, n_snapshots)
+    X_t = pod.transform(X)
     assert isinstance(
         X_t, xr.DataArray
     ), "Transformed data should be an xarray DataArray."
     assert isinstance(
         X_t.data, np.ndarray
-    ), f"Transformed data should have numpy ndarray as data, got {type(X_t.data)}."
-    assert X_t.shape == (X_centered.shape[0], n_modes), (
-        f"Transformed data should have shape ({X_centered.shape[0]}, {n_modes}), "
+    ), "Transformed data should be backed by a numpy array."
+    assert X_t.shape == (n_modes, n_time), (
+        f"Transformed data should have shape ({n_modes}, {n_time}), "
         f"but got {X_t.shape}."
     )
+    # For training data, transform should match fitted time coefficients
+    assert np.allclose(X_t.data, pod.time_coeffs.data, atol=1e-6)
+
+
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
+def test_transform_lazy(matrix_type):
+    """Test the transform method with compute=False returns lazy Dask array."""
+    X = make_dataarray(matrix_type)
+    n_modes = N_MODES
+    n_time = X.sizes["time"]
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    # Even though modes are NumPy-backed, compute=False should return Dask-backed
+    X_t_lazy = pod.transform(X, compute=False)
+    assert isinstance(X_t_lazy, xr.DataArray)
+    assert isinstance(X_t_lazy.data, da.Array), (
+        "Lazy transform should return Dask-backed DataArray, got "
+        f"{type(X_t_lazy.data)}"
+    )
+    assert X_t_lazy.shape == (n_modes, n_time), (
+        f"Transformed data should have shape ({n_modes}, {n_time}), "
+        f"but got {X_t_lazy.shape}."
+    )
+
+    # Verify computation yields same result as eager transform
+    result_lazy = X_t_lazy.compute()
+    result_eager = pod.transform(X, compute=True)
+    assert np.allclose(result_lazy, result_eager.data, atol=1e-6)
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
