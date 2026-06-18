@@ -101,10 +101,13 @@ class POD(TruncatedSVD):
             raise ValueError(msg)
         X = self._preprocess_array(X)
         super().fit(X, **kwargs)
-        assert self._s is not None
-        assert self._v is not None
-        self._time_coeffs = xr.apply_ufunc(
-            np.matmul, np.diag(self._s), self._v, dask="allowed"
+        assert isinstance(self._s, np.ndarray)
+        assert isinstance(self._v, xr.DataArray)
+        self._time_coeffs = xr.DataArray(
+            self._s.reshape(-1, 1) * self._v.data,
+            dims=self._v.dims,
+            coords=self._v.coords,
+            attrs=self._v.attrs,
         )
         return self
 
