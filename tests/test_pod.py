@@ -354,3 +354,280 @@ def test_compute_methods():
 
     pod.compute_energy_ratio()
     assert isinstance(pod.explained_energy_ratio, np.ndarray)
+
+
+# ──────────────────────────────────────────────────────────────
+#  Extended POD tests
+# ──────────────────────────────────────────────────────────────
+
+
+def _make_secondary_dataarray(
+    n_space_c: int,
+    n_time: int,
+    time_dim_pos: int = 1,
+    space_name: str = "space_c",
+) -> xr.DataArray:
+    """Create a Dask-backed DataArray representing a simultaneously
+    measured secondary quantity (e.g. temperature)."""
+    if time_dim_pos == 1:
+        shape = (n_space_c, n_time)
+        chunks = (n_space_c, -1)
+        dims = [space_name, "time"]
+        coords = {space_name: np.arange(n_space_c), "time": np.arange(n_time)}
+    else:
+        shape = (n_time, n_space_c)
+        chunks = (-1, n_space_c)
+        dims = ["time", space_name]
+        coords = {"time": np.arange(n_time), space_name: np.arange(n_space_c)}
+    data = da.random.random(shape, chunks=chunks).astype("float32")
+    return xr.DataArray(data, dims=dims, coords=coords)
+
+
+def test_extended_pod_basic_shape():
+    """Test that extended_pod returns the correct shape and type."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 500
+    C = _make_secondary_dataarray(n_space_c, n_time)
+    chi = pod.extended_pod(C)
+
+    assert isinstance(chi, xr.DataArray), f"Expected xr.DataArray, got {type(chi)}."
+    assert isinstance(
+        chi.data, np.ndarray
+    ), f"Expected numpy-backed DataArray, got {type(chi.data)}."
+    assert chi.shape == (
+        n_space_c,
+        n_modes,
+    ), f"Expected shape ({n_space_c}, {n_modes}), got {chi.shape}."
+    assert chi.dims == (
+        "space_c",
+        "components",
+    ), f"Expected dims ('space_c', 'components'), got {chi.dims}."
+    assert (
+        "space_c" in chi.coords
+    ), "Expected 'space_c' in coords of extended POD modes."
+    assert (
+        "components" in chi.coords
+    ), "Expected 'components' in coords of extended POD modes."
+
+
+def test_extended_pod_same_spatial_dim():
+    """Test extended_pod when the secondary field has the same spatial
+    dimension name as the primary field."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 200
+    C = _make_secondary_dataarray(n_space_c, n_time, space_name="space")
+    chi = pod.extended_pod(C)
+
+    assert chi.shape == (
+        n_space_c,
+        n_modes,
+    ), f"Expected shape ({n_space_c}, {n_modes}), got {chi.shape}."
+    assert chi.dims == (
+        "space",
+        "components",
+    ), f"Expected dims ('space', 'components'), got {chi.dims}."
+
+
+def test_extended_pod_transposed_input():
+    """Test that extended_pod correctly handles an input array where
+    the time dimension is along the rows."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 300
+    C = _make_secondary_dataarray(n_space_c, n_time, time_dim_pos=0)
+    chi = pod.extended_pod(C)
+
+    assert chi.shape == (
+        n_space_c,
+        n_modes,
+    ), f"Expected shape ({n_space_c}, {n_modes}), got {chi.shape}."
+    assert chi.dims == (
+        "space_c",
+        "components",
+    ), f"Expected dims ('space_c', 'components'), got {chi.dims}."
+
+
+def test_extended_pod_lazy():
+    """Test extended_pod with compute=False returns a lazy Dask-backed array."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 400
+    C = _make_secondary_dataarray(n_space_c, n_time)
+    chi_lazy = pod.extended_pod(C, compute=False)
+
+    assert isinstance(
+        chi_lazy, xr.DataArray
+    ), f"Expected xr.DataArray, got {type(chi_lazy)}."
+    assert isinstance(
+        chi_lazy.data, da.Array
+    ), f"Expected Dask-backed DataArray, got {type(chi_lazy.data)}."
+    assert chi_lazy.shape == (
+        n_space_c,
+        n_modes,
+    ), f"Expected shape ({n_space_c}, {n_modes}), got {chi_lazy.shape}."
+
+    chi_eager = pod.extended_pod(C, compute=True)
+    assert np.allclose(
+        chi_lazy.compute().data, chi_eager.data, atol=1e-5
+    ), "Lazy and eager extended POD results should match."
+
+
+def test_extended_pod_formula():
+    """Test the extended POD formula against a direct NumPy reference
+    implementation following Boree (2003)."""
+    np.random.seed(42)
+    n_space = 1000
+    n_time = 100
+    n_modes = 5
+
+    X_np = np.random.randn(n_space, n_time).astype("float32")
+    X = xr.DataArray(
+        da.from_array(X_np, chunks=(n_space, -1)),
+        dims=["space", "time"],
+        coords={"space": np.arange(n_space), "time": np.arange(n_time)},
+    )
+
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 600
+    C_np = np.random.randn(n_space_c, n_time).astype("float32")
+    C = xr.DataArray(
+        da.from_array(C_np, chunks=(n_space_c, -1)),
+        dims=["space_c", "time"],
+        coords={"space_c": np.arange(n_space_c), "time": np.arange(n_time)},
+    )
+
+    chi = pod.extended_pod(C)
+
+    # Reference: chi_j = (1/(lambda_j * N)) * sum_i(a_ij * c_i')
+    C_fluc = C_np - C_np.mean(axis=1, keepdims=True)
+    # Reconstruct the actual (unscaled) time coefficients
+    time_coeffs_stored = pod.time_coeffs.data  # (n_modes, n_time)
+    scale_factor = pod._scale_factor
+    a_actual = scale_factor * time_coeffs_stored  # (n_modes, n_time)
+    energy = pod.energy  # lambda_j = sigma_j^2
+
+    chi_ref = np.zeros((n_space_c, n_modes), dtype="float64")
+    for j in range(n_modes):
+        chi_ref[:, j] = (C_fluc @ a_actual[j, :]) / (energy[j] * n_time)
+
+    assert np.allclose(
+        chi.data, chi_ref, atol=1e-4
+    ), "Extended POD modes do not match the reference implementation."
+
+
+def test_extended_pod_not_fitted_error():
+    """Test that calling extended_pod before fit raises RuntimeError."""
+    pod = POD(n_modes=5)
+    C = _make_secondary_dataarray(100, 50)
+    with pytest.raises(RuntimeError, match="not fitted yet"):
+        pod.extended_pod(C)
+
+
+def test_extended_pod_wrong_time_dim_error():
+    """Test that extended_pod raises ValueError when time dim is missing."""
+    X = make_dataarray("tall-and-skinny")
+    pod = POD(n_modes=N_MODES)
+    pod.fit(X)
+
+    C = xr.DataArray(
+        da.random.random((100, 50), chunks=(100, -1)),
+        dims=["space_c", "wrong_time"],
+    )
+    with pytest.raises(ValueError, match="is not a dimension of the input array"):
+        pod.extended_pod(C)
+
+
+def test_extended_pod_snapshot_mismatch_error():
+    """Test that extended_pod raises ValueError for mismatched snapshot count."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    pod = POD(n_modes=N_MODES)
+    pod.fit(X)
+
+    C = _make_secondary_dataarray(200, n_time + 10)
+    with pytest.raises(ValueError, match="Number of snapshots"):
+        pod.extended_pod(C)
+
+
+def test_extended_pod_time_coord_mismatch_error():
+    """Test that extended_pod raises ValueError when time coordinates
+    do not match (non-simultaneous measurement)."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    pod = POD(n_modes=N_MODES)
+    pod.fit(X)
+
+    # Create C with same number of snapshots but different time coords
+    n_space_c = 200
+    C = xr.DataArray(
+        da.random.random((n_space_c, n_time), chunks=(n_space_c, -1)),
+        dims=["space_c", "time"],
+        coords={
+            "space_c": np.arange(n_space_c),
+            "time": np.arange(n_time) + 1000,
+        },
+    )
+    with pytest.raises(ValueError, match="measured simultaneously"):
+        pod.extended_pod(C)
+
+
+def test_extended_pod_remove_mean_false():
+    """Test extended_pod with remove_mean=False skips mean removal."""
+    X = make_dataarray("tall-and-skinny")
+    n_time = X.sizes["time"]
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 300
+    C = _make_secondary_dataarray(n_space_c, n_time)
+    C_fluc = C - C.mean(dim="time")
+
+    chi_with_mean_removal = pod.extended_pod(C, remove_mean=True)
+    chi_pre_removed = pod.extended_pod(C_fluc, remove_mean=False)
+
+    assert np.allclose(
+        chi_with_mean_removal.data, chi_pre_removed.data, atol=1e-5
+    ), "Results with remove_mean=True and pre-removed mean should match."
+
+
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
+def test_extended_pod_different_matrix_types(matrix_type):
+    """Test extended_pod works for different matrix geometries."""
+    X = make_dataarray(matrix_type)
+    n_time = X.sizes["time"]
+    n_modes = N_MODES
+    pod = POD(n_modes=n_modes)
+    pod.fit(X)
+
+    n_space_c = 250
+    C = _make_secondary_dataarray(n_space_c, n_time)
+    chi = pod.extended_pod(C)
+
+    assert chi.shape == (
+        n_space_c,
+        n_modes,
+    ), f"Expected shape ({n_space_c}, {n_modes}), got {chi.shape}."
+    assert isinstance(
+        chi.data, np.ndarray
+    ), f"Expected numpy-backed DataArray, got {type(chi.data)}."
