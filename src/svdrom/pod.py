@@ -217,6 +217,18 @@ class POD(TruncatedSVD):
             )
             raise ValueError(msg)
 
+        # Check that the time coordinates match (simultaneous measurement)
+        if self._time_dim in C.coords and self._time_dim in self._time_coeffs.coords:
+            c_time_coords = C.coords[self._time_dim].values
+            fit_time_coords = self._time_coeffs.coords[self._time_dim].values
+            if not np.array_equal(c_time_coords, fit_time_coords):
+                msg = (
+                    "Time coordinates of the input array do not match "
+                    "those of the training data. Extended POD requires "
+                    "the fields to be measured simultaneously."
+                )
+                raise ValueError(msg)
+
         C_prime = C - C.mean(dim=self._time_dim) if remove_mean else C
 
         energy = self._s**2
