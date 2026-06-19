@@ -166,6 +166,11 @@ class POD(TruncatedSVD):
         and c_i' is the fluctuating part of the simultaneously measured
         quantity C.
 
+        Unlike the POD spatial modes, the extended POD modes are not
+        unit-norm. Their norm quantifies the spatial energy in C' that
+        is linearly correlated with mode j, and can be used to define a
+        scalar correlation coefficient (Boree, 2003).
+
         Note: the stored `time_coeffs` attribute equals a_ij / sqrt(N),
         so the formula as implemented becomes:
 
