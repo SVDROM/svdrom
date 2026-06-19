@@ -160,9 +160,16 @@ class POD(TruncatedSVD):
             chi_j = (1 / (lambda_j * N)) * sum_i(a_ij * c_i')
 
         where N is the number of snapshots, lambda_j is the energy of
-        the j-th POD mode, a_ij are the time coefficients of the j-th
-        POD mode, and c_i' is the fluctuating part of the simultaneously
-        measured quantity.
+        the j-th POD mode, a_ij = phi_j . X'(t_i) are the (unscaled)
+        time coefficients of the j-th POD mode (i.e. the projection of
+        the fluctuating snapshot of the primary field X onto mode phi_j),
+        and c_i' is the fluctuating part of the simultaneously measured
+        quantity C.
+
+        Note: the stored `time_coeffs` attribute equals a_ij / sqrt(N),
+        so the formula as implemented becomes:
+
+            chi_j = (1 / (lambda_j * sqrt(N))) * sum_i(a_ij_stored * c_i')
 
         Parameters
         ----------
