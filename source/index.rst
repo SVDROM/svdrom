@@ -20,4 +20,9 @@ This is achieved by using scalable implementations of the ROM algorithms, and by
    contents/installation
    contents/svd
    contents/dmd
+   contents/preprocessing
+   contents/weather
+   contents/io
+   contents/configuration
+   contents/utilities
    contents/development
