@@ -91,7 +91,7 @@ check_untyped_defs = true
 strict = false
 [[tool.mypy.overrides]]
 module = ["pydmd.*", "weatherbench2.*"]
-follow_untyped_imports = true
+ignore_missing_imports = true
 
 [tool.ruff]
 src = ["src"]

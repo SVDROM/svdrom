@@ -13,6 +13,13 @@ source ./venv/bin/activate   # now `python` points to the virtualenv python
 pip install -v -e ".[dev]"    # -v for verbose, -e for editable, [dev] for dev dependencies
 ```
 
+Some tests exercise optional weather-scoring functionality. To run the full
+test suite, install the optional extras as well:
+
+```zsh
+pip install -v -e ".[dev,extras]"
+```
+
 # Post setup
 
 You should prepare pre-commit, which will help you by checking that commits pass
@@ -33,6 +40,8 @@ Use pytest to run the unit checks:
 ```bash
 pytest
 ```
+
+Without the optional extras, tests that require those dependencies are skipped.
 
 # Coverage
 
