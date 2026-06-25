@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "svdrom"
 version = "0.1.0"
 authors = [
-  { name = "David Salvador-Jasin", email = "davidsaljas@gmail.com" },
+  { name = "David Salvador-Jasin", email = "svd.rom.oss@gmail.com" },
+  { name = "Robert Vava", email = "svd.rom.oss@gmail.com" },
 ]
 description = "A Python package for SVD-based reduced order modeling of large datasets, directly on your laptop."
 readme = "README.md"
@@ -53,10 +54,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/dsj976/svdrom"
-"Bug Tracker" = "https://github.com/dsj976/svdrom/issues"
-Discussions = "https://github.com/dsj976/svdrom/discussions"
-Changelog = "https://github.com/dsj976/svdrom/releases"
+Homepage = "https://github.com/SVDROM/svdrom"
+"Bug Tracker" = "https://github.com/SVDROM/svdrom/issues"
+Discussions = "https://github.com/SVDROM/svdrom/discussions"
+Changelog = "https://github.com/SVDROM/svdrom/releases"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

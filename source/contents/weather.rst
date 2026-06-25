@@ -15,8 +15,8 @@ The weather utilities module provides metrics and tools commonly used in weather
     :type prediction: xarray.DataArray
     :param lat_weighting: Whether to apply latitude-based weighting so that spatial locations closer to the Equator receive a larger weight than those closer to the poles. Default is ``True``.
     :type lat_weighting: bool
-    :param dims: Dimensions along which to average the RMSE. Default is ``("latitude", "longitude")``, which returns the RMSE as a function of prediction time (assuming a single pressure level). Set to ``None`` if you don't want to perform averaging.
-    :type dims: str or tuple[str, ...] or None
+    :param dims: Dimensions along which to average the RMSE. Default is ``("latitude", "longitude")``, which returns the RMSE as a function of prediction time (assuming a single pressure level).
+    :type dims: str or tuple[str, ...]
     :returns: The RMSE as a DataArray.
     :rtype: xarray.DataArray
 
@@ -30,8 +30,8 @@ The weather utilities module provides metrics and tools commonly used in weather
     :type prediction: xarray.DataArray
     :param lat_weighting: Whether to apply latitude-based weighting so that spatial locations closer to the Equator receive a larger weight than those closer to the poles. Default is ``True``.
     :type lat_weighting: bool
-    :param dims: Dimensions along which to average the MAE. Default is ``("latitude", "longitude")``, which returns the MAE as a function of prediction time. Set to ``None`` if you don't want to perform averaging.
-    :type dims: str or tuple[str, ...] or None
+    :param dims: Dimensions along which to average the MAE. Default is ``("latitude", "longitude")``, which returns the MAE as a function of prediction time.
+    :type dims: str or tuple[str, ...]
     :returns: The MAE as a DataArray.
     :rtype: xarray.DataArray
 
