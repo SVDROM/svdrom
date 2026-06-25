@@ -98,7 +98,7 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
         :returns: The projected array with shape ``(n_samples, n_components)``.
         :rtype: xarray.DataArray
 
-    .. py:method:: reconstruct_snapshot(snapshot, snapshot_dim='time')
+    .. py:method:: reconstruct(snapshot, snapshot_dim='time')
 
         Reconstruct one or more snapshots from the truncated decomposition using :math:`\hat{\mathbf{x}}_j = \mathbf{U}_k\, \mathbf{\Sigma}_k\, \mathbf{v}_j`. The method indexes along the snapshot dimension of the fitted decomposition and handles both positional (``int``) and label-based (``str``) selection. When a label matches multiple entries (e.g. a date label resolving to several timestamps) all matching snapshots are returned stacked along the snapshot dimension.
 
@@ -117,19 +117,19 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
 
         .. code-block:: python
 
-            tsvd.reconstruct_snapshot(0)
+            tsvd.reconstruct(0)
 
         Reconstruct every snapshot that falls on the date label ``"2017-01-01"``:
 
         .. code-block:: python
 
-            tsvd.reconstruct_snapshot("2017-01-01")
+            tsvd.reconstruct("2017-01-01")
 
         Reconstruct a snapshot from an array whose snapshot dimension is not named ``"time"``:
 
         .. code-block:: python
 
-            tsvd.reconstruct_snapshot(0, snapshot_dim="samples")
+            tsvd.reconstruct(0, snapshot_dim="samples")
 
     .. py:method:: compute_u()
 

@@ -47,7 +47,7 @@ coverage html
 This project uses pre-commit for all style checking. Install pre-commit and run:
 
 ```bash
-pre-commit run -a
+pre-commit run --all-files
 ```
 
 to check all files.
