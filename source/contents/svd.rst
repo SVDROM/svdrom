@@ -82,8 +82,8 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
         :param X: Input snapshot matrix with shape ``(n_samples, n_features)``. Must be a Dask-backed ``xarray.DataArray``.
         :type X: xarray.DataArray
         :param \**kwargs: Additional keyword arguments forwarded to ``dask.array.linalg.svd_compressed`` when *algorithm* is ``"randomized"`` (e.g. ``n_power_iter``, ``n_oversamples``, ``seed``). See `svd_compressed docs <https://docs.dask.org/en/stable/generated/dask.array.linalg.svd_compressed.html>`_ for details. Ignored when *algorithm* is ``"tsqr"``.
-        :returns: ``None``. The decomposition is stored on the instance and exposed through :py:attr:`u`, :py:attr:`s`, :py:attr:`v` and :py:attr:`explained_var_ratio`.
-        :rtype: None
+        :returns: The fitted instance (``self``), allowing method chaining.
+        :rtype: TruncatedSVD
 
         .. note::
             When using the the ``"randomized"`` algorithm, increasing the number of power iterations (via ``n_power_iter``) and the number of oversamples (via ``n_oversamples``) can significantly improve accuracy, at the expense of additional but manageable computational cost.
