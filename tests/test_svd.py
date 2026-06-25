@@ -187,9 +187,9 @@ def test_transform(matrix_type):
     assert isinstance(
         X_t, xr.DataArray
     ), "Transformed data should be an xarray DataArray."
-    assert isinstance(X_t.data, np.ndarray), (
-        "Transformed data should have numpy ndarray as data, " f"got {type(X_t.data)}."
-    )
+    assert isinstance(
+        X_t.data, np.ndarray
+    ), f"Transformed data should have numpy ndarray as data, got {type(X_t.data)}."
     assert X_t.shape == (X.shape[0], n_components), (
         f"Transformed data should have shape ({X.shape[0]}, {n_components}), "
         f"but got {X_t.shape}."
