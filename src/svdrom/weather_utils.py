@@ -1,11 +1,6 @@
 import numpy as np
 import pandas as pd
-import properscoring as ps  # type: ignore[import-not-found]
 import xarray as xr
-from weatherbench2.derived_variables import (
-    ZonalEnergySpectrum,
-    interpolate_spectral_frequencies,
-)
 
 
 def compute_rmse(
@@ -66,16 +61,17 @@ def compute_rmse(
         )
         raise ValueError(msg) from e
     prediction = prediction.real  # keep only real part of the prediction
-    rmse = ground_truth.copy(data=(ground_truth - prediction) ** 2)
+    squared_error = ground_truth.copy(data=(ground_truth - prediction) ** 2)
     if lat_weighting:
         if "latitude" not in ground_truth.dims:
             msg = "Expected the input data to have a dimension named latitude."
             raise ValueError(msg)
         lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
-        rmse = rmse.weighted(lat_weights)
-    rmse = rmse.mean(dim=dims)
+        rmse = squared_error.weighted(lat_weights).mean(dim=dims)
+    else:
+        rmse = squared_error.mean(dim=dims)
     rmse = rmse.clip(min=0)
-    return np.sqrt(rmse)
+    return rmse**0.5
 
 
 def compute_mae(
@@ -127,14 +123,16 @@ def compute_mae(
         )
         raise ValueError(msg) from e
     prediction = prediction.real  # keep only real part of the prediction
-    mae = ground_truth.copy(data=np.abs(ground_truth - prediction))
+    absolute_error = ground_truth.copy(data=np.abs(ground_truth - prediction))
     if lat_weighting:
         if "latitude" not in ground_truth.dims:
             msg = "Expected the input data to have a dimension named latitude."
             raise ValueError(msg)
         lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
-        mae = mae.weighted(lat_weights)
-    return mae.mean(dim=dims).clip(min=0)
+        mae = absolute_error.weighted(lat_weights).mean(dim=dims)
+    else:
+        mae = absolute_error.mean(dim=dims)
+    return mae.clip(min=0)
 
 
 def compute_climatology(
@@ -339,6 +337,18 @@ def compute_energy_spectrum(
         )
         raise ValueError(msg)
 
+    try:
+        from weatherbench2.derived_variables import (
+            ZonalEnergySpectrum,
+            interpolate_spectral_frequencies,
+        )
+    except ImportError as e:
+        msg = (
+            "compute_energy_spectrum() requires the optional 'extras' dependencies. "
+            'Install them with: pip install "svdrom[extras]"'
+        )
+        raise ImportError(msg) from e
+
     ds = data.to_dataset(name="variable")
     var_name = str(next(iter(ds.data_vars)))
     spectrum = ZonalEnergySpectrum(var_name).compute(ds)
@@ -412,6 +422,15 @@ def compute_crps_gaussian(
             "The prediction standard deviation array must only contain positive values."
         )
         raise ValueError(msg)
+
+    try:
+        import properscoring as ps  # type: ignore[import-not-found]
+    except ImportError as e:
+        msg = (
+            "compute_crps_gaussian() requires the optional 'extras' dependencies. "
+            'Install them with: pip install "svdrom[extras]"'
+        )
+        raise ImportError(msg) from e
 
     try:
         # will raise error if not on the same spatio-temporal grid

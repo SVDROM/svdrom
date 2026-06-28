@@ -74,33 +74,33 @@ def test_basic(algorithm):
 
     X = make_dataarray("tall-and-skinny")
     tsvd.fit(X)
-    assert isinstance(tsvd.u, xr.DataArray), (
-        f"u should be an xarray DataArray, got {type(tsvd.u)}."
-    )
+    assert isinstance(
+        tsvd.u, xr.DataArray
+    ), f"u should be an xarray DataArray, got {type(tsvd.u)}."
     assert isinstance(tsvd.u.data, np.ndarray), (
         "u should be a xarray DataArray with numpy ndarray data, "
         f"got {type(tsvd.u.data)}."
     )
-    assert isinstance(tsvd.v, xr.DataArray), (
-        f"v should be an xarray DataArray, got {type(tsvd.v)}."
-    )
+    assert isinstance(
+        tsvd.v, xr.DataArray
+    ), f"v should be an xarray DataArray, got {type(tsvd.v)}."
     assert isinstance(tsvd.v.data, np.ndarray), (
         "v should be a xarray DataArray with numpy ndarray data, "
         f"got {type(tsvd.v.data)}."
     )
-    assert isinstance(tsvd.s, np.ndarray), (
-        f"s should be a numpy ndarray, got {type(tsvd.s)}."
-    )
+    assert isinstance(
+        tsvd.s, np.ndarray
+    ), f"s should be a numpy ndarray, got {type(tsvd.s)}."
     assert isinstance(tsvd.explained_var_ratio, np.ndarray), (
         "explained_var_ratio should be a numpy ndarray, "
         f"got {type(tsvd.explained_var_ratio)}."
     )
-    assert np.all(tsvd.explained_var_ratio > 0), (
-        "explained_var_ratio should contain values greater than 0."
-    )
-    assert np.all(tsvd.explained_var_ratio < 1), (
-        "explained_var_ratio should contain values less than 1."
-    )
+    assert np.all(
+        tsvd.explained_var_ratio > 0
+    ), "explained_var_ratio should contain values greater than 0."
+    assert np.all(
+        tsvd.explained_var_ratio < 1
+    ), "explained_var_ratio should contain values less than 1."
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat", "square"])
@@ -125,9 +125,9 @@ def test_matrix_types(matrix_type, algorithm):
         n_components,
         X.shape[1],
     ), f"Shape of v should be ({n_components}, {n_features}), got {tsvd.v.shape}."
-    assert tsvd.s.shape == (n_components,), (
-        f"Shape of s should be ({n_components},), got {tsvd.s.shape}."
-    )
+    assert tsvd.s.shape == (
+        n_components,
+    ), f"Shape of s should be ({n_components},), got {tsvd.s.shape}."
     assert tsvd.explained_var_ratio.shape == (n_components,), (
         f"Shape of explained_var_ratio should be ({n_components},), "
         f"got {tsvd.explained_var_ratio.shape}."
@@ -167,12 +167,12 @@ def test_orthogonality(algorithm):
     u_ortho = u.T @ u
     v_ortho = v @ v.T
 
-    assert np.allclose(u_ortho, identity_k, atol=1e-5), (
-        "u.T @ u is not close to identity."
-    )
-    assert np.allclose(v_ortho, identity_k, atol=1e-5), (
-        "v @ v.T is not close to identity."
-    )
+    assert np.allclose(
+        u_ortho, identity_k, atol=1e-5
+    ), "u.T @ u is not close to identity."
+    assert np.allclose(
+        v_ortho, identity_k, atol=1e-5
+    ), "v @ v.T is not close to identity."
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
@@ -184,19 +184,19 @@ def test_transform(matrix_type):
     tsvd.fit(X)
 
     X_t = tsvd.transform(X)
-    assert isinstance(X_t, xr.DataArray), (
-        "Transformed data should be an xarray DataArray."
-    )
-    assert isinstance(X_t.data, np.ndarray), (
-        f"Transformed data should have numpy ndarray as data, got {type(X_t.data)}."
-    )
+    assert isinstance(
+        X_t, xr.DataArray
+    ), "Transformed data should be an xarray DataArray."
+    assert isinstance(
+        X_t.data, np.ndarray
+    ), f"Transformed data should have numpy ndarray as data, got {type(X_t.data)}."
     assert X_t.shape == (X.shape[0], n_components), (
         f"Transformed data should have shape ({X.shape[0]}, {n_components}), "
         f"but got {X_t.shape}."
     )
-    assert np.allclose(tsvd.u * tsvd.s, X_t, atol=1e-5), (
-        "Transformed data does not match u * s."
-    )
+    assert np.allclose(
+        tsvd.u * tsvd.s, X_t, atol=1e-5
+    ), "Transformed data does not match u * s."
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
@@ -208,9 +208,9 @@ def test_reconstruct(matrix_type):
     tsvd.fit(X)
 
     X_r = tsvd.reconstruct(0)
-    assert isinstance(X_r, xr.DataArray), (
-        f"Reconstructed snapshot should be an xarray DataArray, got {type(X_r)}."
-    )
+    assert isinstance(
+        X_r, xr.DataArray
+    ), f"Reconstructed snapshot should be an xarray DataArray, got {type(X_r)}."
     assert isinstance(X_r.data, np.ndarray), (
         "Reconstructed snapshot should have numpy ndarray as data, "
         f"got {type(X_r.data)}."
@@ -219,9 +219,9 @@ def test_reconstruct(matrix_type):
         "Reconstructed snapshot should have shape "
         f"({tsvd.u.shape[0]}), got {X_r.shape}."
     )
-    assert samples_coord_name in X_r.dims, (
-        f"Reconstructed snapshot should have dimension {samples_coord_name}."
-    )
+    assert (
+        samples_coord_name in X_r.dims
+    ), f"Reconstructed snapshot should have dimension {samples_coord_name}."
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
@@ -235,14 +235,14 @@ def test_reconstruct_full(matrix_type):
 
     X_r = tsvd.reconstruct()
     assert isinstance(X_r, xr.DataArray)
-    assert X_r.shape == X.shape, (
-        f"Full reconstruction should have shape {X.shape}, got {X_r.shape}."
-    )
+    assert (
+        X_r.shape == X.shape
+    ), f"Full reconstruction should have shape {X.shape}, got {X_r.shape}."
     assert set(X_r.dims) == set(X.dims)
     manual = tsvd.u.data @ np.diag(tsvd.s) @ tsvd.v.data
-    assert np.allclose(X_r.transpose(*X.dims).values, manual, atol=1e-5), (
-        "Full reconstruction does not match U @ diag(S) @ V."
-    )
+    assert np.allclose(
+        X_r.transpose(*X.dims).values, manual, atol=1e-5
+    ), "Full reconstruction does not match U @ diag(S) @ V."
 
 
 def test_reconstruct_index_slice():
@@ -253,9 +253,10 @@ def test_reconstruct_index_slice():
     tsvd.fit(X)
 
     X_r = tsvd.reconstruct(slice(0, 5))
-    assert X_r.shape == (X.shape[0], 5), (
-        f"Sliced reconstruction should have shape ({X.shape[0]}, 5), got {X_r.shape}."
-    )
+    assert X_r.shape == (
+        X.shape[0],
+        5,
+    ), f"Sliced reconstruction should have shape ({X.shape[0]}, 5), got {X_r.shape}."
     assert time_coord_name in X_r.dims
     assert np.array_equal(X_r[time_coord_name].values, np.arange(5))
 
