@@ -25,10 +25,6 @@ def open_dataset(filename: str, chunks: str | dict | int = "auto"):
     -------
     xr.Dataset
         The opened Xarray DataSet.
-
-    Notes
-    -----
-    The opened DataSet is assigned to the `ds` attribute of the instance.
     """
     try:
         logger.info("Opening Xarray.DataSet from %s.", filename)
@@ -59,10 +55,6 @@ def open_dataarray(filename: str, chunks: str | dict | int = "auto"):
     -------
     xr.DataArray
         The opened Xarray DataArray.
-
-    Notes
-    -----
-    The opened DataArray is assigned to the `da` attribute of the instance.
     """
     try:
         logger.info("Opening Xarray.DataArray from %s.", filename)
