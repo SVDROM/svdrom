@@ -19,6 +19,11 @@ The weather utilities module provides metrics and tools commonly used in weather
     :type dims: str or tuple[str, ...]
     :returns: The RMSE as a DataArray.
     :rtype: xarray.DataArray
+    :raises ValueError: If the input arrays are not defined on the same spatio-temporal grid, or if *lat_weighting* is ``True`` but the input data has no ``"latitude"`` dimension.
+
+    .. rubric:: Notes
+
+    If the inputs are Dask-backed ``DataArray`` objects, the function builds the task graph lazily. Trigger computation manually (e.g. by calling ``.compute()``). It is recommended to set up a multi-threading Dask cluster before calling the function.
 
 .. py:function:: compute_mae(ground_truth, prediction, lat_weighting=True, dims=('latitude', 'longitude'))
 
@@ -34,6 +39,11 @@ The weather utilities module provides metrics and tools commonly used in weather
     :type dims: str or tuple[str, ...]
     :returns: The MAE as a DataArray.
     :rtype: xarray.DataArray
+    :raises ValueError: If the input arrays are not defined on the same spatio-temporal grid, or if *lat_weighting* is ``True`` but the input data has no ``"latitude"`` dimension.
+
+    .. rubric:: Notes
+
+    If the inputs are Dask-backed ``DataArray`` objects, the function builds the task graph lazily. Trigger computation manually (e.g. by calling ``.compute()``). It is recommended to set up a multi-threading Dask cluster before calling the function.
 
 .. py:function:: compute_climatology(data, smooth_window=61, probabilistic=False)
 
@@ -151,7 +161,7 @@ The weather utilities module provides metrics and tools commonly used in weather
     :type prediction: xarray.DataArray
     :param climatology: The climatology, defined on the same spatio-temporal grid as the ground truth and prediction. Must have a ``time`` dimension matching the other arrays. Can be Dask-backed or NumPy-backed.
     :type climatology: xarray.DataArray
-    :returns: The ACC averaged over latitude and longitude and as a function of time. Latitude weighting is applied.
+    :returns: The Anomaly Correlation Coefficient as a latitude-weighted normalized cross-correlation, reduced over latitude and longitude and returned as a function of time.
     :rtype: xarray.DataArray
 
     .. rubric:: Notes
