@@ -400,7 +400,7 @@ class TruncatedSVD(DecompositionModel):
     def _select_snapshot(
         self,
         array: xr.DataArray,
-        snapshot: slice | int | str | None,
+        snapshot: object,
         snapshot_dim: str,
     ) -> xr.DataArray:
         """Subset ``array`` along ``snapshot_dim`` based on the type of
