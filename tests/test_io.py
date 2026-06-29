@@ -2,6 +2,7 @@ import os
 import shutil
 
 import netCDF4  # noqa: F401
+import numpy as np
 import pytest
 import xarray as xr
 from make_test_data import DataGenerator
@@ -40,7 +41,7 @@ class TestDataHandler:
         cls.data_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "test_data", "io"
         )
-        cls.data_generator = DataGenerator()
+        cls.data_generator = DataGenerator(t=np.arange(20))
 
         # create clean directories
         if os.path.exists(cls.data_dir):
