@@ -329,6 +329,38 @@ def test_reconstruct(matrix_type):
     ), "Reconstructed snapshot should have the spatial dimension."
 
 
+@pytest.mark.parametrize("remove_mean", [True, False])
+def test_reconstruct_original_scale(remove_mean):
+    """Test that reconstruct() undoes the mean removal and 1/sqrt(N)
+    scaling applied during fit(), recovering the original-scale data.
+
+    Uses a rank-deficient input so that keeping n_modes = n_time - 1
+    (the maximum allowed by TruncatedSVD) captures the full rank of the
+    (possibly mean-removed) data, isolating the effect of the scale/mean
+    postprocessing from ordinary truncation error.
+    """
+    rng = np.random.default_rng(0)
+    n_space, n_time, rank = 20, 15, 10
+    A = rng.standard_normal((n_space, rank))
+    B = rng.standard_normal((rank, n_time))
+    X_np = (A @ B).astype("float64")
+    X = xr.DataArray(
+        da.from_array(X_np, chunks=(n_space, n_time)),
+        dims=["space", "time"],
+        coords={"time": np.arange(n_time)},
+    )
+
+    pod = POD(n_modes=n_time - 1, remove_mean=remove_mean)
+    pod.fit(X)
+
+    for snapshot in [0, n_time // 2, n_time - 1]:
+        reconstructed = pod.reconstruct(snapshot, snapshot_dim="time")
+        assert np.allclose(reconstructed.values, X_np[:, snapshot], atol=1e-8), (
+            f"Reconstructed snapshot {snapshot} should match the original-scale "
+            f"data at (near-)full rank, with remove_mean={remove_mean}."
+        )
+
+
 def test_compute_methods():
     """Test that the `compute_*` convenience methods work."""
     n_modes = 5
