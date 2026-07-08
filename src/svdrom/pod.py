@@ -313,8 +313,10 @@ class POD(TruncatedSVD):
         return result
 
     def reconstruct(
-        self, snapshot: int | str, snapshot_dim: str = "time"
+        self, snapshot: int | str, snapshot_dim: str | None = None
     ) -> xr.DataArray:
+        if snapshot_dim is None:
+            snapshot_dim = self._time_dim
         result = super().reconstruct(snapshot, snapshot_dim)
         # undo pre-processing
         assert self._scale_factor is not None
