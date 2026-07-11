@@ -169,8 +169,8 @@ class POD(TruncatedSVD):
         max_components = min(n_spatial_points, n_snapshots)
         if self._n_components >= max_components:
             msg = (
-                "n_components must be less than min(n_spatial_points, "
-                f"n_snapshots). Got n_components: {self.n_components}, "
+                "n_modes must be less than min(n_spatial_points, "
+                f"n_snapshots). Got n_modes: {self.n_components}, "
                 f"n_spatial_points: {n_spatial_points}, n_snapshots: {n_snapshots}."
             )
             logger.error(msg)
