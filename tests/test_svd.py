@@ -155,6 +155,49 @@ def test_matrix_types(matrix_type, algorithm):
 
 
 @pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
+def test_n_components_exceeds_rank(algorithm):
+    """n_components must be below the maximum theoretical rank,
+    min(n_samples, n_features). Requesting n_components equal to the
+    smaller dimension of a short-and-fat matrix used to mislabel the
+    right singular vectors, so it must be rejected.
+    """
+    X = make_dataarray("short-and-fat")
+    max_rank = min(X.shape)
+    tsvd = TruncatedSVD(n_components=max_rank, algorithm=algorithm)
+    with pytest.raises(ValueError, match="maximum theoretical rank"):
+        tsvd.fit(X)
+
+
+def test_singular_vectors_labeled_by_kind():
+    """The caller tells `_singular_vectors_to_dataarray` whether the
+    vectors are left (`u`) or right (`v`), so an ambiguously-shaped
+    (square) input is labeled correctly regardless of its shape.
+    """
+    n = 5
+    X = xr.DataArray(
+        da.random.random((n, n)),
+        dims=[samples_coord_name, time_coord_name],
+        coords={
+            samples_coord_name: np.arange(n),
+            time_coord_name: np.arange(n),
+        },
+    )
+    tsvd = TruncatedSVD(n_components=2)
+    vectors = np.random.default_rng().random((n, n)).astype("float32")
+
+    u_da = tsvd._singular_vectors_to_dataarray(vectors, X, kind="u")
+    assert u_da.name == "svd_u"
+    assert tuple(u_da.dims) == (samples_coord_name, "components")
+
+    v_da = tsvd._singular_vectors_to_dataarray(vectors, X, kind="v")
+    assert v_da.name == "svd_v"
+    assert tuple(v_da.dims) == ("components", time_coord_name)
+
+    with pytest.raises(ValueError, match="Must be either 'u' or 'v'"):
+        tsvd._singular_vectors_to_dataarray(vectors, X, kind="invalid")
+
+
+@pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
 def test_orthogonality(algorithm):
     """Test orthogonality of u and v matrices."""
     X = make_dataarray("tall-and-skinny")
