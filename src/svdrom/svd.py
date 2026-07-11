@@ -30,8 +30,9 @@ class TruncatedSVD(DecompositionModel):
         Parameters
         ----------
         n_components: int
-            Number of SVD components to keep. Must be less than
-            the number of features of the input array.
+            Number of SVD components to keep. Must be less than the
+            maximum theoretical rank of the input array, i.e.
+            min(n_samples, n_features).
         algorithm: str, {'tsqr', 'randomized'}, (default 'tsqr')
             SVD algorithm to use. 'tsqr' only supports chunking
             along one dimension (i.e. the array should be tall-and-skinny
@@ -162,10 +163,13 @@ class TruncatedSVD(DecompositionModel):
             )
             logger.error(msg)
             raise ValueError(msg)
-        if self._n_components >= X.shape[1]:
+        max_rank = min(X.shape[0], X.shape[1])
+        if self._n_components >= max_rank:
             msg = (
-                "n_components must be less than n_features. "
-                f"Got n_components: {self.n_components}, n_features: {X.shape[1]}."
+                "n_components must be less than the maximum theoretical rank "
+                "of the input array, min(n_samples, n_features). "
+                f"Got n_components: {self.n_components}, n_samples: {X.shape[0]}, "
+                f"n_features: {X.shape[1]}."
             )
             logger.error(msg)
             raise ValueError(msg)
@@ -178,24 +182,34 @@ class TruncatedSVD(DecompositionModel):
             raise TypeError(msg)
 
     def _singular_vectors_to_dataarray(
-        self, singular_vectors: np.ndarray, X: xr.DataArray
+        self, singular_vectors: np.ndarray, X: xr.DataArray, kind: str
     ) -> xr.DataArray:
         """Transform the singular vectors into a Xarray DataArray following
         the dimensions and coordinates of the DataArray on which SVD was
-        performed. The function automatically identifies whether the input
-        singular vectors are left or right singular vectors.
+        performed.
+
+        Parameters
+        ----------
+        singular_vectors: np.ndarray
+            The singular vectors to transform into a DataArray.
+        X: xr.DataArray
+            The DataArray on which SVD was performed.
+        kind: str, {'u', 'v'}
+            Whether the input singular vectors are the left (`'u'`) or
+            right (`'v'`) singular vectors. This is passed explicitly by
+            the caller, which already knows, rather than being inferred
+            from the shape of the input array.
         """
-        if singular_vectors.shape[0] == X.shape[0]:
+        old_dims = list(X.dims)
+        if kind == "u":
             # this corresponds to `u`: replace second dimension (e.g. 'time')
-            old_dims = list(X.dims)
             new_dims = [old_dims[0], "components"]
             coords = {k: v for k, v in X.coords.items() if k != old_dims[1]}
             coords["components"] = np.arange(singular_vectors.shape[1])
             name = "svd_u"
             attrs = None
-        elif singular_vectors.shape[1] == X.shape[1]:
+        elif kind == "v":
             # this corresponds to `v`: replace first dimension (e.g. 'samples')
-            old_dims = list(X.dims)
             new_dims = ["components", old_dims[1]]
             coords = {old_dims[1]: X.coords[old_dims[1]]}
             coords["components"] = np.arange(singular_vectors.shape[0])
@@ -210,10 +224,7 @@ class TruncatedSVD(DecompositionModel):
                 else None
             )
         else:
-            msg = (
-                "Cannot transform singular vectors into Xarray DataArray. "
-                "Shape of singular_vectors does not match X."
-            )
+            msg = f"Invalid value for 'kind': {kind!r}. Must be either 'u' or 'v'."
             logger.error(msg)
             raise ValueError(msg)
         return xr.DataArray(
@@ -297,9 +308,9 @@ class TruncatedSVD(DecompositionModel):
             idx += 1
         if self._compute_var_ratio:
             explained_var_ratio = computed[idx]
-        self._u = self._singular_vectors_to_dataarray(u, X)
+        self._u = self._singular_vectors_to_dataarray(u, X, kind="u")
         self._s = s
-        self._v = self._singular_vectors_to_dataarray(v, X)
+        self._v = self._singular_vectors_to_dataarray(v, X, kind="v")
         self._explained_var_ratio = explained_var_ratio
 
         return self
@@ -377,7 +388,7 @@ class TruncatedSVD(DecompositionModel):
             )
             logger.exception(msg)
             raise ValueError(msg) from e
-        return self._singular_vectors_to_dataarray(X_da_transformed, X)
+        return self._singular_vectors_to_dataarray(X_da_transformed, X, kind="u")
 
     def reconstruct(
         self,
