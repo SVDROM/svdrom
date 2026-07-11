@@ -154,14 +154,15 @@ def test_matrix_types(matrix_type, algorithm):
     assert "components" in v_coords, "v should have 'components' coordinate."
 
 
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat", "square"])
 @pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
-def test_n_components_exceeds_rank(algorithm):
+def test_n_components_exceeds_rank(matrix_type, algorithm):
     """n_components must be below the maximum theoretical rank,
     min(n_samples, n_features). Requesting n_components equal to the
     smaller dimension of a short-and-fat matrix used to mislabel the
     right singular vectors, so it must be rejected.
     """
-    X = make_dataarray("short-and-fat")
+    X = make_dataarray(matrix_type)
     max_rank = min(X.shape)
     tsvd = TruncatedSVD(n_components=max_rank, algorithm=algorithm)
     with pytest.raises(ValueError, match="maximum theoretical rank"):
