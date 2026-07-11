@@ -10,6 +10,69 @@ logger = setup_logger("POD", "pod.log")
 
 
 class POD(TruncatedSVD):
+    """Proper Orthogonal Decomposition (POD) of a spatio-temporal field.
+
+    POD decomposes a spatio-temporal snapshot matrix X (space x time)
+    into a set of orthonormal spatial modes, an energy (eigenvalue)
+    associated with each mode, and time coefficients describing how
+    each mode evolves in time:
+
+        X'(x, t) ~= sum_j phi_j(x) * a_j(t)
+
+    where X' is the (optionally mean-removed) fluctuating field, phi_j
+    are the POD spatial modes, and a_j are the corresponding time
+    coefficients. Internally this is computed via a truncated SVD of
+    X' (scaled by 1/sqrt(n_snapshots) so that modal energy does not
+    depend on the number of snapshots), inheriting the SVD backend
+    and lazy/eager compute behaviour from `TruncatedSVD`.
+
+    Parameters
+    ----------
+    n_modes: int
+        Number of POD modes to compute. Must be less than
+        min(n_spatial_points, n_snapshots).
+    svd_algorithm: str, {'tsqr', 'randomized'}, (default 'tsqr')
+        SVD algorithm used as the backend. See `TruncatedSVD` for
+        details on the trade-offs between the two algorithms.
+    compute_modes: bool, (default True)
+        Whether to eagerly compute the POD spatial modes. If False,
+        `modes` is returned as a lazy Dask collection until
+        `compute_modes()` is called.
+    compute_time_coeffs: bool, (default True)
+        Whether to eagerly compute the POD time coefficients. If
+        False, `time_coeffs` is returned as a lazy Dask collection
+        until `compute_time_coeffs()` is called.
+    compute_energy_ratio: bool, (default False)
+        Whether to eagerly compute the ratio of total energy
+        explained by each mode. If False, `explained_energy_ratio`
+        is returned as a lazy Dask collection until
+        `compute_energy_ratio()` is called.
+    rechunk: bool, (default False)
+        If using the 'randomized' algorithm, whether to rechunk the
+        input array to ensure a single chunk along the smallest
+        dimension. See `TruncatedSVD` for more details.
+    remove_mean: bool, (default True)
+        Whether to remove the temporal mean from the input array
+        before computing the POD modes. The mean is stored and
+        added back automatically in `reconstruct()`, and subtracted
+        automatically in `transform()`.
+    time_dimension: str, (default 'time')
+        Name of the dimension in the input array that represents
+        time. The input array is transposed automatically if this
+        dimension is not already along the columns.
+
+    Attributes
+    ----------
+    modes: xr.DataArray or None
+        POD spatial modes, shape (n_spatial_points, n_modes).
+    time_coeffs: xr.DataArray or None
+        Time coefficients, shape (n_modes, n_snapshots).
+    energy: np.ndarray or None
+        Energy (variance) explained by each POD mode.
+    explained_energy_ratio: np.ndarray or da.Array or None
+        Ratio of total energy explained by each POD mode.
+    """
+
     def __init__(
         self,
         n_modes: int,
