@@ -253,6 +253,23 @@ def test_invalid_time_dimension_error():
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
+def test_n_modes_exceeds_max_rank_error(matrix_type):
+    """Test that a ValueError is raised when n_modes is at least
+    min(n_spatial_points, n_snapshots), the maximum possible rank."""
+    X = make_dataarray(matrix_type)
+    n_space, n_time = X.shape
+    max_components = min(n_space, n_time)
+
+    pod = POD(n_modes=max_components)
+    with pytest.raises(ValueError, match="min\\(n_spatial_points, n_snapshots\\)"):
+        pod.fit(X)
+
+    # One less than the max rank should be accepted.
+    pod = POD(n_modes=max_components - 1)
+    pod.fit(X)
+
+
+@pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
 def test_transform(matrix_type):
     """Test the transform method projects data onto POD modes correctly."""
     X = make_dataarray(matrix_type)

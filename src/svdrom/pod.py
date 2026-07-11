@@ -99,6 +99,20 @@ class POD(TruncatedSVD):
                 "is not a dimension of the input array."
             )
             raise ValueError(msg)
+
+        n_snapshots = X.sizes[self._time_dim]
+        space_dim = next(d for d in X.dims if d != self._time_dim)
+        n_spatial_points = X.sizes[space_dim]
+        max_components = min(n_spatial_points, n_snapshots)
+        if self._n_components >= max_components:
+            msg = (
+                "n_components must be less than min(n_spatial_points, "
+                f"n_snapshots). Got n_components: {self.n_components}, "
+                f"n_spatial_points: {n_spatial_points}, n_snapshots: {n_snapshots}."
+            )
+            logger.error(msg)
+            raise ValueError(msg)
+
         X = self._preprocess_array(X)
         super().fit(X, **kwargs)
         assert isinstance(self._s, np.ndarray)
