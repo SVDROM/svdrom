@@ -419,8 +419,7 @@ def compute_crps_gaussian(
 
     if (prediction_std.values <= 0.0).any():
         msg = (
-            "The prediction standard deviation array must "
-            "only contain positive values."
+            "The prediction standard deviation array must only contain positive values."
         )
         raise ValueError(msg)
 

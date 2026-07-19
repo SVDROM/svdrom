@@ -91,11 +91,8 @@ class OptDMD(DecompositionModel):
             msg = "'num_trials' must be an integer greater than zero."
             logger.exception(msg)
             raise ValueError(msg)
-        if (
-            isinstance(trial_size, float)
-            and (trial_size <= 0 or trial_size >= 1)
-            or isinstance(trial_size, int)
-            and trial_size <= 0
+        if (isinstance(trial_size, float) and (trial_size <= 0 or trial_size >= 1)) or (
+            isinstance(trial_size, int) and trial_size <= 0
         ):
             msg = "'trial_size' must be a positive integer or a float between 0 and 1."
             logger.exception(msg)
@@ -1063,7 +1060,7 @@ class OptDMD(DecompositionModel):
             raise RuntimeError(msg) from e
 
         estimated_size = self._estimate_array_size(t_forecast)
-        msg = f"Estimated forecast size is {estimated_size/1e3:.3f} KB."
+        msg = f"Estimated forecast size is {estimated_size / 1e3:.3f} KB."
         logger.info(msg)
 
         if estimated_size > memory_limit_bytes:
@@ -1294,7 +1291,7 @@ class OptDMD(DecompositionModel):
             raise RuntimeError(msg) from e
 
         estimated_size = self._estimate_array_size(t_reconstruct)
-        msg = f"Estimated reconstruction size is {estimated_size/1e3:.3f} KB."
+        msg = f"Estimated reconstruction size is {estimated_size / 1e3:.3f} KB."
         logger.info(msg)
 
         # compute the reconstruction, using Dask or directly with NumPy

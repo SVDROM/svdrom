@@ -2,6 +2,7 @@ import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
+from dask.utils import parse_bytes
 
 import svdrom.config as config
 from svdrom.logger import setup_logger
@@ -390,67 +391,246 @@ class TruncatedSVD(DecompositionModel):
             raise ValueError(msg) from e
         return self._singular_vectors_to_dataarray(X_da_transformed, X, kind="u")
 
+    @staticmethod
+    def _is_index_slice(s: slice) -> bool:
+        """Classify a slice as index-based (integer bounds) or label-based
+        (string bounds). ``None`` bounds are compatible with either.
+        """
+        start, stop = s.start, s.stop
+        # ``None`` bounds count as int-compatible, so ``slice(None, None)``
+        # is classified as index-based and resolved via ``isel`` (a no-op
+        # that selects everything), matching the ``snapshot=None`` path.
+        start_int = start is None or isinstance(start, int)
+        stop_int = stop is None or isinstance(stop, int)
+        if start_int and stop_int:
+            return True
+        start_str = start is None or isinstance(start, str)
+        stop_str = stop is None or isinstance(stop, str)
+        if start_str and stop_str:
+            return False
+        msg = "Slice bounds must be all int (or None) or all str (or None)."
+        logger.error(msg)
+        raise TypeError(msg)
+
+    def _select_snapshot(
+        self,
+        array: xr.DataArray,
+        snapshot: object,
+        snapshot_dim: str,
+    ) -> xr.DataArray:
+        """Subset ``array`` along ``snapshot_dim`` based on the type of
+        ``snapshot``. ``None`` returns ``array`` unchanged; integers and
+        integer-bounded slices use positional indexing (``isel``); strings
+        and string-bounded slices use label indexing (``sel``).
+        """
+        if snapshot is None:
+            return array
+        try:
+            if isinstance(snapshot, slice):
+                if self._is_index_slice(snapshot):
+                    return array.isel({snapshot_dim: snapshot})
+                return array.sel({snapshot_dim: snapshot})
+            if isinstance(snapshot, int):
+                return array.isel({snapshot_dim: snapshot})
+            if isinstance(snapshot, str):
+                return array.sel({snapshot_dim: snapshot})
+        except IndexError as e:
+            msg = (
+                f"Snapshot index {snapshot} is out of bounds along "
+                f"dimension '{snapshot_dim}'."
+            )
+            logger.exception(msg)
+            raise IndexError(msg) from e
+        except KeyError as e:
+            msg = (
+                f"Snapshot label {snapshot!r} not found along "
+                f"dimension '{snapshot_dim}'."
+            )
+            logger.exception(msg)
+            raise KeyError(msg) from e
+        msg = "'snapshot' must be a slice, int, str, or None."
+        logger.error(msg)
+        raise TypeError(msg)
+
     def reconstruct(
         self,
-        snapshot: int | str,
+        snapshot: slice | int | str | None = None,
         snapshot_dim: str = "time",
+        memory_limit_bytes: float = 1e9,
     ) -> xr.DataArray:
-        """Reconstruct a snapshot or group of snapshots from
-        the left singular vectors, singular values, and right
-        singular vectors.
+        """Reconstruct one, many, or all snapshots from the truncated
+        SVD decomposition.
+
+        Computes the rank-`k` approximation `U @ diag(S) @ V` restricted
+        to the selection along `snapshot_dim`.
 
         Parameters
         ----------
-        snapshot: int | str
-            The index or label of the snapshot to reconstruct.
-            If it's an integer, it's interpreted as an index. If it's
-            a string, it's interpreted as a label.
+        snapshot: slice | int | str | None, (default None)
+            - ``None``: reconstructs the entire dataset on which the SVD
+              was fitted.
+            - ``int``: reconstructs a single snapshot by positional index.
+            - ``str``: reconstructs all snapshots whose coordinate label
+              matches.
+            - ``slice``: reconstructs a range along ``snapshot_dim``. Slices
+              with integer (or ``None``) bounds are treated as positional
+              index slices; slices with string bounds are treated as
+              coordinate-label slices.
         snapshot_dim: str, (default 'time')
-            The dimension along which the snapshots are indexed.
+            The dimension along which snapshots are indexed. Must be a
+            dimension of either ``u`` or ``v``.
+        memory_limit_bytes: float, (default 1e9)
+            The memory threshold that decides whether to compute the
+            reconstruction eagerly with NumPy or lazily with Dask. The
+            reconstruction size is estimated from the factor shapes without
+            materialising the product. If the estimate is below
+            ``memory_limit_bytes``, the result is computed and returned as a
+            NumPy-backed ``xr.DataArray``. If it is above
+            ``memory_limit_bytes``, the result is returned as a lazy,
+            Dask-backed ``xr.DataArray``: the factors are wrapped into Dask
+            and the product is chunked along ``snapshot_dim`` (with every
+            other dimension kept whole) so that the reconstruction stays out
+            of memory even when ``u``/``v`` are small and NumPy-backed. The
+            per-chunk size targets Dask's configured ``array.chunk-size``.
+            The default is 1e9 (1 GB). A single-snapshot selection (an
+            ``int`` index or a single-matching ``str`` label) is always
+            computed eagerly and returned NumPy-backed, regardless of this
+            threshold, since it drops ``snapshot_dim`` and leaves no axis to
+            chunk along.
 
         Returns
         -------
-        xr.DataArray: The reconstructed snapshot/s as an Xarray DataArray.
+        xr.DataArray: The reconstructed data. NumPy-backed or Dask-backed
+            depending on ``memory_limit_bytes``.
 
         Examples
         --------
-        # Reconstructs the first snapshot
+        # Reconstruct the first snapshot by positional index
         >>> tsvd.reconstruct(0)
 
-        # Reconstructs all snapshots with label '2017-01-01'
+        # Reconstruct all snapshots with label '2017-01-01'
         >>> tsvd.reconstruct("2017-01-01")
+
+        # Reconstruct a range of snapshots by label
+        >>> tsvd.reconstruct(slice("2017-01-01", "2017-01-31"))
+
+        # Reconstruct the entire training dataset
+        >>> tsvd.reconstruct()
         """
         self._check_is_fitted(["_u", "_v", "_s"])
         assert self._u is not None  # needed for mypy check
         assert self._v is not None
         assert self._s is not None
 
-        if isinstance(snapshot, int):
-            try:
-                if snapshot_dim in self._v.dims:
-                    return self._u @ (self._s * self._v[:, snapshot].T)
-                if snapshot_dim in self._u.dims:
-                    return (self._u[snapshot_dim, :] * self._s) @ self._v
-                msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
-                logger.error(msg)
-                raise ValueError(msg)
-            except IndexError as e:
-                msg = (
-                    f"Snapshot index {snapshot} is out of bounds for the right "
-                    f"singular vectors with shape {self._v.shape}."
-                )
-                logger.exception(msg)
-                raise IndexError(msg) from e
+        in_v = snapshot_dim in self._v.dims
+        in_u = snapshot_dim in self._u.dims
+        if not in_v and not in_u:
+            msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
+            logger.error(msg)
+            raise ValueError(msg)
+
+        # Wrap singular values as a DataArray so broadcasting aligns by
+        # the named 'components' dim (raw numpy would align by position).
+        s_da = xr.DataArray(self._s, dims=("components",))
+
+        selector = self._v if in_v else self._u
+        subset = self._select_snapshot(selector, snapshot, snapshot_dim)
+
+        # Assemble the two matmul operands. The reconstruction contracts
+        # the small 'components' dim, so the product can be far larger than
+        # either operand (e.g. only a few modes spread over a large
+        # spatial-by-snapshot grid).
+        if in_v:
+            left, right = self._u, s_da * subset
         else:
-            try:
-                if snapshot_dim in self._v.dims:
-                    return self._u @ (self._s * self._v.loc[:, snapshot].T)
-                if snapshot_dim in self._u.dims:
-                    return (self._u.loc[snapshot_dim, :] * self._s) @ self._v
-                msg = f"Snapshot dimension '{snapshot_dim}' does not exist."
-                logger.error(msg)
-                raise ValueError(msg)
-            except KeyError as e:
-                msg = f"Snapshot '{snapshot}' not found in the right singular vectors."
-                logger.exception(msg)
-                raise KeyError(msg) from e
+            left, right = subset * s_da, self._v
+
+        logger.info("Computing the SVD reconstruction...")
+        try:
+            # Estimate the product size from operand metadata alone, without
+            # materialising it, to decide between an eager NumPy result and a
+            # lazy Dask one (mirroring OptDMD.reconstruct).
+            estimated_size = self._estimate_matmul_size(left, right)
+            msg = f"Estimated reconstruction size is {estimated_size / 1e3:.3f} KB."
+            logger.info(msg)
+
+            # A scalar selection (an int index or a single-matching str
+            # label) drops 'snapshot_dim' from both operands, leaving no
+            # snapshot axis to chunk along. A single snapshot is always small
+            # enough to reconstruct eagerly, so fall back to NumPy in that case.
+            snapshot_dropped = snapshot_dim not in left.dims and (
+                snapshot_dim not in right.dims
+            )
+
+            if estimated_size > memory_limit_bytes and not snapshot_dropped:
+                # Build the (potentially multi-GB) product as a lazy, chunked
+                # Dask array. This bounds memory even when u/v are small and
+                # NumPy-backed, since the operands are wrapped into Dask and
+                # the matmul is chunked along the snapshot dimension.
+                logger.info("Will use Dask to compute the reconstruction.")
+                left, right = self._chunk_operands_for_matmul(
+                    left, right, snapshot_dim, estimated_size
+                )
+                reconstruction = left @ right
+            else:
+                # Under the limit: compute eagerly and return NumPy-backed,
+                # even if u/v happened to be Dask-backed.
+                logger.info("Will not use Dask to compute the reconstruction.")
+                reconstruction = left @ right
+                if isinstance(reconstruction.data, da.Array):
+                    reconstruction = reconstruction.compute()
+        except Exception as e:
+            msg = "Error computing the SVD reconstruction."
+            logger.exception(msg)
+            raise RuntimeError(msg) from e
+        logger.info("Done.")
+
+        return reconstruction
+
+    @staticmethod
+    def _estimate_matmul_size(left: xr.DataArray, right: xr.DataArray) -> int:
+        """Estimate the byte size of ``left @ right`` from operand metadata,
+        without materialising the product. ``xr.dot`` contracts the shared
+        (here, 'components') dimension; the output spans the remaining
+        dimensions of both operands.
+        """
+        shared = set(left.dims) & set(right.dims)
+        n_elements = 1
+        for operand in (left, right):
+            for dim, size in operand.sizes.items():
+                if dim not in shared:
+                    n_elements *= size
+        itemsize = np.result_type(left.dtype, right.dtype).itemsize
+        return n_elements * itemsize
+
+    def _chunk_operands_for_matmul(
+        self,
+        left: xr.DataArray,
+        right: xr.DataArray,
+        snapshot_dim: str,
+        estimated_size: int,
+    ) -> tuple[xr.DataArray, xr.DataArray]:
+        """Convert the matmul operands to Dask-backed arrays chunked so the
+        product stays lazy and bounded in memory. Following OptDMD, the
+        reconstruction is chunked along ``snapshot_dim`` (the column-like
+        axis) while every other output dimension, and the contracted
+        'components' dimension, are kept whole. The snapshot chunk size
+        targets Dask's configured ``array.chunk-size``.
+        """
+        n_snapshots = (
+            left.sizes[snapshot_dim]
+            if snapshot_dim in left.sizes
+            else right.sizes[snapshot_dim]
+        )
+        bytes_per_snapshot = max(estimated_size // n_snapshots, 1)
+        target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
+        snapshot_chunk = max(round(target_chunk_bytes / bytes_per_snapshot), 1)
+
+        def chunk(operand: xr.DataArray) -> xr.DataArray:
+            chunks = {
+                dim: (snapshot_chunk if dim == snapshot_dim else -1)
+                for dim in operand.dims
+            }
+            return operand.chunk(chunks)
+
+        return chunk(left), chunk(right)
