@@ -492,7 +492,11 @@ class TruncatedSVD(DecompositionModel):
             other dimension kept whole) so that the reconstruction stays out
             of memory even when ``u``/``v`` are small and NumPy-backed. The
             per-chunk size targets Dask's configured ``array.chunk-size``.
-            The default is 1e9 (1 GB).
+            The default is 1e9 (1 GB). A single-snapshot selection (an
+            ``int`` index or a single-matching ``str`` label) is always
+            computed eagerly and returned NumPy-backed, regardless of this
+            threshold, since it drops ``snapshot_dim`` and leaves no axis to
+            chunk along.
 
         Returns
         -------
@@ -550,7 +554,15 @@ class TruncatedSVD(DecompositionModel):
             msg = f"Estimated reconstruction size is {estimated_size / 1e3:.3f} KB."
             logger.info(msg)
 
-            if estimated_size > memory_limit_bytes:
+            # A scalar selection (an int index or a single-matching str
+            # label) drops 'snapshot_dim' from both operands, leaving no
+            # snapshot axis to chunk along. A single snapshot is always small
+            # enough to reconstruct eagerly, so fall back to NumPy in that case.
+            snapshot_dropped = snapshot_dim not in left.dims and (
+                snapshot_dim not in right.dims
+            )
+
+            if estimated_size > memory_limit_bytes and not snapshot_dropped:
                 # Build the (potentially multi-GB) product as a lazy, chunked
                 # Dask array. This bounds memory even when u/v are small and
                 # NumPy-backed, since the operands are wrapped into Dask and

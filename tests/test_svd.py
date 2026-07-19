@@ -410,6 +410,24 @@ def test_reconstruct_over_memory_limit_chunks_u_snapshot_dim():
     ), "The non-snapshot (feature) axis should be kept whole."
 
 
+def test_reconstruct_single_snapshot_over_limit_returns_numpy():
+    """A single-snapshot selection (int index) drops ``snapshot_dim``, so it
+    is always computed eagerly and returned NumPy-backed, even when
+    ``memory_limit_bytes`` is tiny (which would otherwise force the Dask path).
+    """
+    X = make_dataarray("tall-and-skinny")
+    tsvd = TruncatedSVD(n_components=10)
+    tsvd.fit(X)
+
+    X_r = tsvd.reconstruct(0, memory_limit_bytes=1)
+    assert isinstance(X_r.data, np.ndarray), (
+        "A single-snapshot reconstruction should be NumPy-backed regardless "
+        "of the memory limit."
+    )
+    assert X_r.shape == (X.shape[0],)
+    assert samples_coord_name in X_r.dims
+
+
 def test_reconstruct_under_memory_limit_returns_numpy():
     """Under ``memory_limit_bytes`` the reconstruction is computed eagerly and
     returned NumPy-backed.
