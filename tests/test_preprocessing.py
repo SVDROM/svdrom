@@ -151,7 +151,7 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         X_delayed.time.values,
         expected_time_coord,
     ), (
-        f"Expected the time coordinate to be equal to t[:{-d+1}], "
+        f"Expected the time coordinate to be equal to t[:{-d + 1}], "
         "where t is the time coordinate of the original matrix."
     )
 
@@ -190,5 +190,5 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         X_delayed[:n_samples, d - 1].compute().data,
     ), (
         "After Hankel pre-processing, expected "
-        f"X[{(d-1) * n_samples}:, 0] to equal X[:{n_samples}, {d-1}]."
+        f"X[{(d - 1) * n_samples}:, 0] to equal X[:{n_samples}, {d - 1}]."
     )
