@@ -1,3 +1,4 @@
+import dask
 import dask.array as da
 import numpy as np
 import pytest
@@ -349,6 +350,93 @@ def test_reconstruct_along_u_dim():
         f"(3, {X.shape[1]}), got {X_r.shape}."
     )
     assert time_coord_name in X_r.dims
+
+
+def test_reconstruct_over_memory_limit_returns_chunked_dask():
+    """When the estimated reconstruction exceeds ``memory_limit_bytes``, the
+    result is a lazy, chunked Dask array even though ``u``/``v`` are small and
+    NumPy-backed. Chunking follows ``snapshot_dim`` while other dims are kept
+    whole, and the values match the eager reconstruction.
+    """
+    X = make_dataarray("tall-and-skinny")
+    tsvd = TruncatedSVD(n_components=10)
+    tsvd.fit(X)
+    # precondition: a default fit materialises u/v to NumPy
+    assert isinstance(tsvd.u.data, np.ndarray)
+    assert isinstance(tsvd.v.data, np.ndarray)
+
+    # Force the over-limit path, with a small chunk target so the snapshot
+    # axis is genuinely split into more than one chunk.
+    with dask.config.set({"array.chunk-size": "20kB"}):
+        X_r = tsvd.reconstruct(memory_limit_bytes=1)
+
+    assert isinstance(
+        X_r.data, da.Array
+    ), "Over-limit reconstruction should be Dask-backed."
+    samples_axis = X_r.dims.index(samples_coord_name)
+    time_axis = X_r.dims.index(time_coord_name)
+    assert (
+        len(X_r.chunks[samples_axis]) == 1
+    ), "The non-snapshot (spatial) axis should be kept whole."
+    assert (
+        len(X_r.chunks[time_axis]) > 1
+    ), "The snapshot axis should be split into multiple chunks."
+
+    X_r_eager = tsvd.reconstruct()
+    assert np.allclose(
+        X_r.transpose(*X_r_eager.dims).values, X_r_eager.values, atol=1e-5
+    ), "Lazy over-limit reconstruction must match the eager one."
+
+
+def test_reconstruct_over_memory_limit_chunks_u_snapshot_dim():
+    """Over the memory limit with ``snapshot_dim`` living in ``u``, chunking
+    follows the ``u`` snapshot axis while the feature axis is kept whole.
+    """
+    X = make_dataarray("tall-and-skinny")
+    tsvd = TruncatedSVD(n_components=10)
+    tsvd.fit(X)
+
+    with dask.config.set({"array.chunk-size": "20kB"}):
+        X_r = tsvd.reconstruct(memory_limit_bytes=1, snapshot_dim=samples_coord_name)
+
+    assert isinstance(X_r.data, da.Array)
+    samples_axis = X_r.dims.index(samples_coord_name)
+    time_axis = X_r.dims.index(time_coord_name)
+    assert (
+        len(X_r.chunks[samples_axis]) > 1
+    ), "The snapshot axis (in u) should be split into multiple chunks."
+    assert (
+        len(X_r.chunks[time_axis]) == 1
+    ), "The non-snapshot (feature) axis should be kept whole."
+
+
+def test_reconstruct_under_memory_limit_returns_numpy():
+    """Under ``memory_limit_bytes`` the reconstruction is computed eagerly and
+    returned NumPy-backed.
+    """
+    X = make_dataarray("tall-and-skinny")
+    tsvd = TruncatedSVD(n_components=10)
+    tsvd.fit(X)
+
+    X_r = tsvd.reconstruct(memory_limit_bytes=1e12)
+    assert isinstance(
+        X_r.data, np.ndarray
+    ), "Under-limit reconstruction should be NumPy-backed."
+
+
+def test_reconstruct_under_limit_computes_lazy_factors():
+    """Under the limit, a lazy (Dask-backed) factorisation is still computed to
+    a NumPy-backed reconstruction.
+    """
+    X = make_dataarray("tall-and-skinny")
+    tsvd = TruncatedSVD(n_components=10, compute_u=False, compute_v=False)
+    tsvd.fit(X)
+    assert isinstance(tsvd.u.data, da.Array)  # precondition: lazy factors
+
+    X_r = tsvd.reconstruct(memory_limit_bytes=1e12)
+    assert isinstance(
+        X_r.data, np.ndarray
+    ), "Under-limit reconstruction should be computed to NumPy."
 
 
 def test_reconstruct_mixed_bound_slice_raises():

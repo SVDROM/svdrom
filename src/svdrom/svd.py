@@ -2,6 +2,7 @@ import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
+from dask.utils import parse_bytes
 
 import svdrom.config as config
 from svdrom.logger import setup_logger
@@ -452,6 +453,7 @@ class TruncatedSVD(DecompositionModel):
         self,
         snapshot: slice | int | str | None = None,
         snapshot_dim: str = "time",
+        memory_limit_bytes: float = 1e9,
     ) -> xr.DataArray:
         """Reconstruct one, many, or all snapshots from the truncated
         SVD decomposition.
@@ -474,10 +476,25 @@ class TruncatedSVD(DecompositionModel):
         snapshot_dim: str, (default 'time')
             The dimension along which snapshots are indexed. Must be a
             dimension of either ``u`` or ``v``.
+        memory_limit_bytes: float, (default 1e9)
+            The memory threshold that decides whether to compute the
+            reconstruction eagerly with NumPy or lazily with Dask. The
+            reconstruction size is estimated from the factor shapes without
+            materialising the product. If the estimate is below
+            ``memory_limit_bytes``, the result is computed and returned as a
+            NumPy-backed ``xr.DataArray``. If it is above
+            ``memory_limit_bytes``, the result is returned as a lazy,
+            Dask-backed ``xr.DataArray``: the factors are wrapped into Dask
+            and the product is chunked along ``snapshot_dim`` (with every
+            other dimension kept whole) so that the reconstruction stays out
+            of memory even when ``u``/``v`` are small and NumPy-backed. The
+            per-chunk size targets Dask's configured ``array.chunk-size``.
+            The default is 1e9 (1 GB).
 
         Returns
         -------
-        xr.DataArray: The reconstructed data.
+        xr.DataArray: The reconstructed data. NumPy-backed or Dask-backed
+            depending on ``memory_limit_bytes``.
 
         Examples
         --------
@@ -512,6 +529,93 @@ class TruncatedSVD(DecompositionModel):
         selector = self._v if in_v else self._u
         subset = self._select_snapshot(selector, snapshot, snapshot_dim)
 
+        # Assemble the two matmul operands. The reconstruction contracts
+        # the small 'components' dim, so the product can be far larger than
+        # either operand (e.g. only a few modes spread over a large
+        # spatial-by-snapshot grid).
         if in_v:
-            return self._u @ (s_da * subset)
-        return (subset * s_da) @ self._v
+            left, right = self._u, s_da * subset
+        else:
+            left, right = subset * s_da, self._v
+
+        logger.info("Computing the SVD reconstruction...")
+        try:
+            # Estimate the product size from operand metadata alone, without
+            # materialising it, to decide between an eager NumPy result and a
+            # lazy Dask one (mirroring OptDMD.reconstruct).
+            estimated_size = self._estimate_matmul_size(left, right)
+            msg = f"Estimated reconstruction size is {estimated_size / 1e3:.3f} KB."
+            logger.info(msg)
+
+            if estimated_size > memory_limit_bytes:
+                # Build the (potentially multi-GB) product as a lazy, chunked
+                # Dask array. This bounds memory even when u/v are small and
+                # NumPy-backed, since the operands are wrapped into Dask and
+                # the matmul is chunked along the snapshot dimension.
+                logger.info("Will use Dask to compute the reconstruction.")
+                left, right = self._chunk_operands_for_matmul(
+                    left, right, snapshot_dim, estimated_size
+                )
+                reconstruction = left @ right
+            else:
+                # Under the limit: compute eagerly and return NumPy-backed,
+                # even if u/v happened to be Dask-backed.
+                logger.info("Will not use Dask to compute the reconstruction.")
+                reconstruction = left @ right
+                if isinstance(reconstruction.data, da.Array):
+                    reconstruction = reconstruction.compute()
+        except Exception as e:
+            msg = "Error computing the SVD reconstruction."
+            logger.exception(msg)
+            raise RuntimeError(msg) from e
+        logger.info("Done.")
+
+        return reconstruction
+
+    @staticmethod
+    def _estimate_matmul_size(left: xr.DataArray, right: xr.DataArray) -> int:
+        """Estimate the byte size of ``left @ right`` from operand metadata,
+        without materialising the product. ``xr.dot`` contracts the shared
+        (here, 'components') dimension; the output spans the remaining
+        dimensions of both operands.
+        """
+        shared = set(left.dims) & set(right.dims)
+        n_elements = 1
+        for operand in (left, right):
+            for dim, size in operand.sizes.items():
+                if dim not in shared:
+                    n_elements *= size
+        itemsize = np.result_type(left.dtype, right.dtype).itemsize
+        return n_elements * itemsize
+
+    def _chunk_operands_for_matmul(
+        self,
+        left: xr.DataArray,
+        right: xr.DataArray,
+        snapshot_dim: str,
+        estimated_size: int,
+    ) -> tuple[xr.DataArray, xr.DataArray]:
+        """Convert the matmul operands to Dask-backed arrays chunked so the
+        product stays lazy and bounded in memory. Following OptDMD, the
+        reconstruction is chunked along ``snapshot_dim`` (the column-like
+        axis) while every other output dimension, and the contracted
+        'components' dimension, are kept whole. The snapshot chunk size
+        targets Dask's configured ``array.chunk-size``.
+        """
+        n_snapshots = (
+            left.sizes[snapshot_dim]
+            if snapshot_dim in left.sizes
+            else right.sizes[snapshot_dim]
+        )
+        bytes_per_snapshot = max(estimated_size // n_snapshots, 1)
+        target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
+        snapshot_chunk = max(round(target_chunk_bytes / bytes_per_snapshot), 1)
+
+        def chunk(operand: xr.DataArray) -> xr.DataArray:
+            chunks = {
+                dim: (snapshot_chunk if dim == snapshot_dim else -1)
+                for dim in operand.dims
+            }
+            return operand.chunk(chunks)
+
+        return chunk(left), chunk(right)
