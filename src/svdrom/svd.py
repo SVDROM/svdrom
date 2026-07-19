@@ -397,6 +397,9 @@ class TruncatedSVD(DecompositionModel):
         (string bounds). ``None`` bounds are compatible with either.
         """
         start, stop = s.start, s.stop
+        # ``None`` bounds count as int-compatible, so ``slice(None, None)``
+        # is classified as index-based and resolved via ``isel`` (a no-op
+        # that selects everything), matching the ``snapshot=None`` path.
         start_int = start is None or isinstance(start, int)
         stop_int = stop is None or isinstance(stop, int)
         if start_int and stop_int:
