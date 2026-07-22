@@ -4,24 +4,40 @@
 [![PyPI version][pypi-version]][pypi-link]
 [![PyPI platforms][pypi-platforms]][pypi-link]
 
-A Python package for the application of Reduced Order Modeling (ROM) to large datasets using the Singular Value Decomposition (SVD).
-The backbone of SVD-ROM is the truncated SVD, which allows you to perform dimensionality reduction on huge arrays, and implement machine learning methods such as Principal Component Analysis (PCA), Proper Orthogonal Decomposition (POD), Spectral Proper Orthogonal Decomposition (sPOD), or Dynamic Mode Decomposition (DMD).
-These methods have applications in fields such as fluid dynamics, combustion, finance, weather and climate modeling, neuroscience, or chemometrics, to name a few.
-SVD-ROM is work in progress, and currently supports (or will soon support) PCA, POD and DMD.
-Other methods will be implemented in the future.
+A Python package for the application of Reduced Order Modeling (ROM) to large spatio-temporal datasets using the Singular Value Decomposition (SVD).
+A spatio-temporal dataset is one that has both spatial and temporal dimensions, such as weather or climate data, or a numerical simulation of flow past a circular cylinder.
+Despite the many degrees of freedom present in such datasets, they often exhibit low-dimensional structures that can be captured using dimensionality reduction techniques.
+
+SVD-ROM is specifically designed for very large datasets that do not fit in memory.
+It leverages out-of-core, parallel computing, as well as scalable and noise-robust versions of matrix decomposition algorithms such as the Randomized SVD and the Optimized Dynamic Mode Decomposition (DMD).
+SVD-ROM provides a user-friendly API fully built on the Python ecosystem, abstracting away the complexity of distributed computing and memory management from the user.
+It is built on top of [Dask](https://www.dask.org/), a Python library for parallel computing, which enables efficient handling of large-scale data processing on laptops, HPC clusters or the cloud with minimal code changes.
+
+SVD-ROM is work in progress, and currently supports Principal Component Analysis (PCA), Proper Orthogonal Decomposition (POD) and Dynamic Mode Decomposition (DMD).
+We will soon add support for other methods such as the Spectral Proper Orthogonal Decomposition (SPOD).
+
+SVD-ROM is an open-source project that originated at [The Alan Turing Institute (London, UK)](https://www.turing.ac.uk/).
+
 
 ## Installation
 
-From source:
+Intall SVD-ROM from source:
 ```bash
 git clone https://github.com/dsj976/svdrom
 cd svdrom
 python -m pip install .
 ```
 
+It is strongly recommended to install SVD-ROM using [uv](https://docs.astral.sh/uv/):
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install .
+```
+
 ## Usage
 
-The best way to get started is to have a look at the notebooks in the `demos` folder.
+The best way to get started is to have a look at the notebooks in the `demos/` folder.
 
 ## Contributing
 
