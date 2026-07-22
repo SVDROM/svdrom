@@ -67,6 +67,36 @@ pre-commit run -a
 
 to check all files.
 
+# Testing GitHub Actions locally
+
+You can run this repo's GitHub Actions workflows locally with
+[`nektos/act`][nektos-act], via the `gh` CLI extension:
+
+```bash
+gh extension install nektos/gh-act
+```
+
+`act` runs workflows in Docker containers, so make sure Docker is installed
+and running, and that your user can access the Docker socket (on Linux,
+`sudo usermod -aG docker $USER`, then start a new session).
+
+```bash
+gh act --list          # show all jobs act can see across .github/workflows
+gh act -j pre-commit   # run a specific job
+gh act -j checks
+gh act pull_request    # run all jobs for a given event
+```
+
+Notes:
+
+- The `publish` job in `cd.yml` uses OIDC (`id-token: write`) to authenticate
+  to PyPI via trusted publishing, which `act` cannot emulate locally. Only
+  `dist` (the build/check job) is meaningful to run locally.
+- The `release` event has no local equivalent, so testing jobs that trigger
+  on it requires a fake event payload, e.g. `gh act release -e event.json -j dist`
+  with `event.json` containing `{ "action": "published" }`.
+
+[nektos-act]: https://nektosact.com/installation/gh.html
 
 # Getting started
 
