@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "svdrom"
 version = "0.1.0"
 authors = [
-  { name = "David Salvador-Jasin", email = "davidsaljas@gmail.com" },
+  { name = "David Salvador-Jasin", email = "svd.rom.oss@gmail.com" },
+  { name = "Robert Vava"},
 ]
 description = "A Python package for SVD-based reduced order modeling of large datasets, directly on your laptop."
 readme = "README.md"
