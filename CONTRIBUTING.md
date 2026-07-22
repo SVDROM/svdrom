@@ -3,66 +3,76 @@ description of best practices for developing scientific packages.
 
 [spc-dev-intro]: https://learn.scientific-python.org/development/
 
-# Setting up a development environment manually
+# Prerequisites
+
+This project uses **[uv]** for dependency management and virtual-environment
+handling. Please [install uv][uv-install] before proceeding.
+
+[uv]: https://docs.astral.sh/uv/
+[uv-install]: https://docs.astral.sh/uv/getting-started/installation/
+
+# Setting up a development environment
 
 You can set up a development environment by running:
 
-```zsh
-python3 -m venv venv          # create a virtualenv called venv
-source ./venv/bin/activate   # now `python` points to the virtualenv python
-pip install -v -e ".[dev]"    # -v for verbose, -e for editable, [dev] for dev dependencies
+```bash
+uv sync --extra dev
 ```
 
-Some tests exercise optional weather-scoring functionality. To run the full
-test suite, install the optional `weather` dependency as well:
+This creates a `.venv` virtualenv, resolves dependencies, and installs the
+project in editable mode with the `dev` extras (pytest, pytest-cov,
+pre-commit, etc.).
 
-```zsh
-pip install -v -e ".[dev,weather]"
+Some tests exercise optional weather-scoring functionality. To run the full
+test suite, include the `weather` extras as well:
+
+```bash
+uv sync --extra dev --extra weather
 ```
 
 # Post setup
 
 You should prepare pre-commit, which will help you by checking that commits pass
-required checks:
+required checks (`pre-commit` is already included in the `dev` extras):
 
 ```bash
-pip install pre-commit # or brew install pre-commit on macOS
-pre-commit install # this will install a pre-commit hook into the git repo
+uv run pre-commit install # this will install a pre-commit hook into the git repo
 ```
 
-You can also/alternatively run `pre-commit run` (changes only) or
-`pre-commit run --all-files` to check even without installing the hook.
+You can also/alternatively run `uv run pre-commit run` (changes only) or
+`uv run pre-commit run --all-files` to check even without installing the hook.
 
 # Testing
 
 Use pytest to run the unit checks:
 
 ```bash
-pytest
+uv run pytest
 ```
 
-Without the optional `weather`, tests that require those dependencies are skipped.
+Without the optional `weather` extras, tests that require those dependencies are
+skipped.
 
 # Coverage
 
 Use pytest-cov to generate coverage reports:
 
 ```bash
-pytest --cov=svdrom
+uv run pytest --cov=svdrom
 ```
 
 You can generate a HTML coverage report that you can open in your browser by running:
 
 ```bash
-coverage html
+uv run coverage html
 ```
 
 # Pre-commit
 
-This project uses pre-commit for all style checking. Install pre-commit and run:
+This project uses pre-commit for all style checking. Run:
 
 ```bash
-pre-commit run -a
+uv run pre-commit run -a
 ```
 
 to check all files.
