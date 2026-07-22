@@ -14,10 +14,10 @@ pip install -v -e ".[dev]"    # -v for verbose, -e for editable, [dev] for dev d
 ```
 
 Some tests exercise optional weather-scoring functionality. To run the full
-test suite, install the optional extras as well:
+test suite, install the optional `weather` dependency as well:
 
 ```zsh
-pip install -v -e ".[dev,extras]"
+pip install -v -e ".[dev,weather]"
 ```
 
 # Post setup
@@ -41,7 +41,7 @@ Use pytest to run the unit checks:
 pytest
 ```
 
-Without the optional extras, tests that require those dependencies are skipped.
+Without the optional `weather`, tests that require those dependencies are skipped.
 
 # Coverage
 

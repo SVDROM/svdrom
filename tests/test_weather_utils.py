@@ -224,7 +224,7 @@ def test_compute_energy_spectrum(data_generator):
     """Test for the compute_energy_spectrum() function."""
     pytest.importorskip(
         "weatherbench2.derived_variables",
-        reason="compute_energy_spectrum() requires the extras dependencies.",
+        reason="compute_energy_spectrum() requires the weather dependencies.",
     )
     prediction, _ = data_generator()
     spectrum = compute_energy_spectrum(prediction)
@@ -250,7 +250,7 @@ def test_compute_crps_gaussian(
     """Test for the compute_crps_gaussian() function."""
     pytest.importorskip(
         "properscoring",
-        reason="compute_crps_gaussian() requires the extras dependencies.",
+        reason="compute_crps_gaussian() requires the weather dependencies.",
     )
     _, groundtruth = data_generator()
     prediction_mean, prediction_std = probabilistic_prediction_generator

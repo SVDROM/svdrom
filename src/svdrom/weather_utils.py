@@ -344,8 +344,8 @@ def compute_energy_spectrum(
         )
     except ImportError as e:
         msg = (
-            "compute_energy_spectrum() requires the optional 'extras' dependencies. "
-            'Install them with: pip install "svdrom[extras]"'
+            "compute_energy_spectrum() requires the optional 'weather' dependencies. "
+            'Install them with: pip install "svdrom[weather]"'
         )
         raise ImportError(msg) from e
 
@@ -427,8 +427,8 @@ def compute_crps_gaussian(
         import properscoring as ps  # type: ignore[import-not-found]
     except ImportError as e:
         msg = (
-            "compute_crps_gaussian() requires the optional 'extras' dependencies. "
-            'Install them with: pip install "svdrom[extras]"'
+            "compute_crps_gaussian() requires the optional 'weather' dependencies. "
+            'Install them with: pip install "svdrom[weather]"'
         )
         raise ImportError(msg) from e
 

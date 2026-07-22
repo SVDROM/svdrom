@@ -41,7 +41,7 @@ dev = [
   "pytest-dependency",
   "pre-commit",
 ]
-extras = [
+weather = [
   "cartopy >= 0.24.1",
   "gcsfs",
   "weatherbench2 @ git+https://github.com/google-research/weatherbench2.git",

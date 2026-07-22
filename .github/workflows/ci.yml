@@ -43,7 +43,7 @@ jobs:
           allow-prereleases: true
 
       - name: Install package
-        run: python -m pip install .[dev,extras]
+        run: python -m pip install .[dev,weather]
 
       - name: Test package
         run: >-
