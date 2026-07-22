@@ -12,7 +12,6 @@ on:
 
 jobs:
   dist:
-    needs: [pre-commit]
     name: Distribution build
     runs-on: ubuntu-latest
 
