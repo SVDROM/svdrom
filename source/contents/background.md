@@ -76,6 +76,32 @@ In the second step, a parallel and communication-efficient algorithm for direct 
 A major advantage of applying the direct QR factorization, compared to other approaches, is numerical stability.
 The result of a randomized projection + TSQR is an approximate SVD of $\mathbf{X}$ that is massively scalable while retaining accuracy and stability.
 
+## Proper Orthogonal Decomposition
+
+[Proper Orthogonal Decomposition](https://en.wikipedia.org/wiki/Principal_component_analysis) (POD) is a direct application of the SVD to a spatio-temporal field, and is the classical modal decomposition used in fluid dynamics.
+Given the (optionally mean-removed) fluctuating snapshot matrix $\mathbf{X}'$, POD seeks a set of orthonormal spatial modes $\boldsymbol{\phi}_j$ that are optimal in the sense that, for any truncation rank $k$, they capture more of the field's energy (variance) than any other linear basis.
+The field is then represented as
+
+$$
+\mathbf{X}'(\mathbf{x}, t) \approx \sum_{j=1}^{k} \boldsymbol{\phi}_j(\mathbf{x})\, a_j(t),
+$$
+
+where $\boldsymbol{\phi}_j$ are the POD spatial modes and $a_j(t)$ are the associated time coefficients.
+In SVD-ROM this is computed via a truncated SVD of $\mathbf{X}'$: the spatial modes correspond to the left singular vectors $\mathbf{U}_k$, the modal energies to the squared singular values $\sigma_j^2$, and the time coefficients to the singular-value-scaled right singular vectors.
+The fluctuating matrix is scaled by $1/\sqrt{n}$ (with $n$ the number of snapshots) before the decomposition so that the modal energy is independent of the number of snapshots.
+
+### Extended POD
+
+Extended POD [9] correlates the POD modes of a primary field (e.g. a velocity field) with a second quantity $C$ (e.g. temperature or pressure) measured simultaneously in time.
+The extended POD modes are obtained by projecting the fluctuating field $C'$ onto the primary field's time coefficients:
+
+$$
+\boldsymbol{\chi}_j = \frac{1}{\lambda_j\, N} \sum_{i} a_{ij}\, \mathbf{c}_i',
+$$
+
+where $N$ is the number of snapshots, $\lambda_j = \sigma_j^2$ is the energy of the $j$-th POD mode, $a_{ij}$ are its (unscaled) time coefficients, and $\mathbf{c}_i'$ is the fluctuating part of $C$ at snapshot $i$.
+Unlike the POD spatial modes, the extended POD modes are not unit-norm; their norm measures the spatial energy in $C'$ that is linearly correlated with mode $j$, which can be used to define a scalar correlation coefficient between the two fields.
+
 ## Dynamic Mode Decomposition
 
 [Dynamic Mode Decomposition](https://en.wikipedia.org/wiki/Dynamic_mode_decomposition) (DMD) extends the ROM framework of SVD to time-resolved data by extracting coherent spatio-temporal structures and their associated dynamics [5].
@@ -165,3 +191,5 @@ As a result, by implementing the acceleration technique discussed above (scalabl
 [7] Askham, T., & Kutz, J. N. (2018). Variable Projection Methods for an Optimized Dynamic Mode Decomposition. SIAM Journal on Applied Dynamical Systems, 17(1), 380-416.
 
 [8] Sashidhar, D., & Kutz, J. N. (2022). Bagging, optimized dynamic mode decomposition for robust, stable forecasting with spatial and temporal uncertainty quantification. Phil. Trans. R. Soc. A 380: 20210199.
+
+[9] Borée, J. (2003). Extended proper orthogonal decomposition: a tool to analyse correlated events in turbulent flows. Experiments in Fluids, 35(2), 188-192.

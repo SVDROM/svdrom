@@ -395,6 +395,39 @@ class POD(TruncatedSVD):
         snapshot_dim: str | None = None,
         memory_limit_bytes: float = 1e9,
     ) -> xr.DataArray:
+        """Reconstruct one, many, or all snapshots from the truncated POD
+        decomposition.
+
+        The reconstruction is delegated to `TruncatedSVD.reconstruct` and
+        the POD preprocessing is then undone: the result is rescaled by
+        the square root of the number of snapshots and, when `remove_mean`
+        was True, the stored temporal mean is added back.
+
+        Parameters
+        ----------
+        snapshot: slice | int | str | None, (default None)
+            - ``None``: reconstructs the entire dataset on which the POD
+              was fitted.
+            - ``int``: reconstructs a single snapshot by positional index.
+            - ``str``: reconstructs all snapshots whose coordinate label
+              matches.
+            - ``slice``: reconstructs a range along ``snapshot_dim``. Slices
+              with integer (or ``None``) bounds are treated as positional
+              index slices; slices with string bounds are treated as
+              coordinate-label slices.
+        snapshot_dim: str | None, (default None)
+            The dimension along which snapshots are indexed. If ``None``,
+            the model's ``time_dimension`` is used.
+        memory_limit_bytes: float, (default 1e9)
+            The memory threshold that decides whether to compute the
+            reconstruction eagerly with NumPy or lazily with Dask. See
+            `TruncatedSVD.reconstruct` for details.
+
+        Returns
+        -------
+        xr.DataArray: The reconstructed data. NumPy-backed or Dask-backed
+            depending on ``memory_limit_bytes``.
+        """
         if snapshot_dim is None:
             snapshot_dim = self._time_dim
         result = super().reconstruct(snapshot, snapshot_dim, memory_limit_bytes)
