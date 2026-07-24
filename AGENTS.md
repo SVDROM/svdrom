@@ -5,7 +5,7 @@
 - Use `uv` for package management
 - Install dependencies: `uv sync --all-extras`
 - Run tests: `uv run pytest`
-- Run pre-commit checks: `uv run pre-commit`
+- Run pre-commit checks: `uv run pre-commit run --all-files`
 
 ## Code Style
 - Follow PEP 8 for Python code
