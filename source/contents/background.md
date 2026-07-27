@@ -96,11 +96,11 @@ Extended POD [5] correlates the POD modes of a primary field (e.g. a velocity fi
 The extended POD modes are obtained by projecting the fluctuating field $\mathbf{C}'$ onto the primary field's time coefficients:
 
 $$
-\boldsymbol{\chi}_j = \frac{1}{\lambda_j\, N} \sum_{i} a_{ij}\, \mathbf{c}_i',
+\boldsymbol{\chi}_j = \frac{1}{\lambda_j\, n} \sum_{i} a_{ij}\, \mathbf{c}_i',
 $$
 
-where $N$ is the number of snapshots, $\lambda_j = \sigma_j^2$ is the energy of the $j$-th POD mode, $a_{ij}$ are its (unscaled) time coefficients, and $\mathbf{c}_i'$ is the fluctuating part of $C$ at snapshot $i$.
-Unlike the POD spatial modes, the extended POD modes are not unit-norm; their norm measures the spatial energy in $C'$ that is linearly correlated with mode $j$, which can be used to define a scalar correlation coefficient between the two fields.
+where $n$ is the number of snapshots, $\lambda_j = \sigma_j^2$ is the energy of the $j$-th POD mode, $a_{ij}$ are its (unscaled) time coefficients, and $\mathbf{c}_i'$ is the fluctuating part of $\mathbf{C}$ at snapshot $i$.
+Unlike the POD spatial modes, the extended POD modes are not unit-norm; their norm measures the spatial energy in $\mathbf{C}'$ that is linearly correlated with mode $j$, which can be used to define a scalar correlation coefficient between the two fields.
 
 ## Dynamic Mode Decomposition
 
@@ -118,7 +118,7 @@ $$
 
 where $\mathbf{\Phi}$ is the $(m \times k)$ matrix of DMD modes, $\mathbf{B}$ is the ($k \times k$) diagonal matrix of mode amplitudes, and $\mathbf{T}(\boldsymbol{\omega})$ is the $(k \times n)$ matrix of temporal dynamics of the form $e^{\omega_j t}$, where the $j^{th}$ row contains the time evolution of the $j^{th}$ DMD mode governed by complex frequency $\omega_j$.
 
-To compute the DMD modes and associated dynamics, the exact DMD algorithm [6] seeks the leading spectral decomposition of the best-fit linear operator $\mathbf{A}$ that advances $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
+To compute the DMD modes and associated dynamics, the exact DMD algorithm [6] seeks the leading spectral decomposition of the best-fit linear operator $\mathbf{A}$ that advances $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$ (not to be confused with the fluctuating field used in the POD sections above):
 
 $$
 \mathbf{X}' = \mathbf{A} \mathbf{X}
@@ -146,16 +146,16 @@ It avoids much of the bias of exact DMD, it is robust to noise and can handle sn
 OptDMD solves the exponential fitting problem directly:
 
 $$
-\mathbf{\Phi}\mathbf{B}, \boldsymbol{\omega} = \arg \min_{\mathbf{\Phi} \mathbf{B}, \boldsymbol{\omega}} || \mathbf{X} - \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega}) ||
+\mathbf{\Phi}\mathbf{B}, \boldsymbol{\omega} = \arg \min_{\mathbf{\Phi} \mathbf{B}, \boldsymbol{\omega}} || \mathbf{X} - \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega}) ||_F
 $$
 
 When the snapshot matrix $\mathbf{X}$ is very large, instead of solving the exponential fitting problem directly on the data, one can perform a rank $k$ truncated SVD of $\mathbf{X}$ and solve the DMD fitting problem in the SVD latent space:
 
 $$
-\mathbf{\Phi}\mathbf{B}, \boldsymbol{\omega} = \arg \min_{\mathbf{\Phi} \mathbf{B}, \boldsymbol{\omega}} || \mathbf{\Sigma}_k \mathbf{V}_k^* - \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega}) ||
+\tilde{\mathbf{\Phi}}\tilde{\mathbf{B}}, \tilde{\boldsymbol{\omega}} = \arg \min_{\tilde{\mathbf{\Phi}} \tilde{\mathbf{B}}, \tilde{\boldsymbol{\omega}}} || \mathbf{\Sigma}_k \mathbf{V}_k^* - \tilde{\mathbf{\Phi}} \tilde{\mathbf{B}} \mathbf{T}(\tilde{\boldsymbol{\omega}}) ||_F
 $$
 
-The resulting DMD modes can then be projected back to the original space using the left singular vectors $\mathbf{U}_k$.
+Here $\tilde{\mathbf{\Phi}}$ is a $(k \times k)$ matrix of latent-space DMD modes (as opposed to the $(m \times k)$ full-space modes $\mathbf{\Phi}$ above), and $\tilde{\mathbf{B}}$, $\tilde{\boldsymbol{\omega}}$ are its associated amplitudes and frequencies. The resulting latent-space DMD modes are then projected back to the original space via $\mathbf{\Phi} = \mathbf{U}_k \tilde{\mathbf{\Phi}}$, using the left singular vectors $\mathbf{U}_k$.
 
 This can be viewed as an encoder (truncated SVD) $\rightarrow$ processor (OptDMD) $\rightarrow$ decoder (orthogonal projection) framework.
 If we use a highly scalable SVD algorithm (randomization + TSQR, as implemented in Dask's `svd_compressed()`), we can  perform DMD on huge tall-and-skinny or moderately-wide snapshot matrices $\mathbf{X}$.
