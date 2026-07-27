@@ -98,15 +98,24 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
         :returns: The projected array with shape ``(n_samples, n_components)``.
         :rtype: xarray.DataArray
 
-    .. py:method:: reconstruct(snapshot, snapshot_dim='time')
+    .. py:method:: reconstruct(snapshot=None, snapshot_dim='time', memory_limit_bytes=1e9)
 
-        Reconstruct one or more snapshots from the truncated decomposition using :math:`\hat{\mathbf{x}}_j = \mathbf{U}_k\, \mathbf{\Sigma}_k\, \mathbf{v}_j`. The method indexes along the snapshot dimension of the fitted decomposition and handles both positional (``int``) and label-based (``str``) selection. When a label matches multiple entries (e.g. a date label resolving to several timestamps) all matching snapshots are returned stacked along the snapshot dimension.
+        Reconstruct one, many, or all snapshots from the truncated decomposition, computing the rank-:math:`k` approximation :math:`\mathbf{U}_k\, \mathbf{\Sigma}_k\, \mathbf{V}_k` restricted to the selection along *snapshot_dim*. The method indexes along the snapshot dimension of the fitted decomposition and handles positional (``int``), label-based (``str``), and range (``slice``) selection. When a label matches multiple entries (e.g. a date label resolving to several timestamps) all matching snapshots are returned stacked along the snapshot dimension.
 
-        :param snapshot: Index or coordinate label of the snapshot to reconstruct. Integers are interpreted as positional indices; strings are interpreted as labels along *snapshot_dim*.
-        :type snapshot: int or str
+        :param snapshot: Selection along *snapshot_dim*.
+
+            * ``None`` — reconstructs the entire dataset on which the SVD was fitted (can be very large).
+            * ``int`` — reconstructs a single snapshot by positional index.
+            * ``str`` — reconstructs all snapshots whose coordinate label matches.
+            * ``slice`` — reconstructs a range along *snapshot_dim*. Slices with integer (or ``None``) bounds are treated as positional index slices; slices with string bounds are treated as coordinate-label slices.
+
+            Default is ``None``.
+        :type snapshot: slice, int, str, or None
         :param snapshot_dim: Name of the dimension along which snapshots are indexed. Must match one of the dimensions of :py:attr:`u` or :py:attr:`v`. Default is ``"time"``.
         :type snapshot_dim: str
-        :returns: The reconstructed snapshot(s).
+        :param memory_limit_bytes: Memory threshold (bytes) that determines whether the reconstruction is computed eagerly with NumPy or lazily with Dask. The reconstruction size is estimated from the factor shapes without materialising the product. If the estimate is below *memory_limit_bytes*, the result is computed and returned as a NumPy-backed ``DataArray``; otherwise the product is built as a lazy, Dask-backed ``DataArray`` chunked along *snapshot_dim* so that the reconstruction stays out of memory. A single-snapshot selection (an ``int`` index or a single-matching ``str`` label) is always computed eagerly, since it drops *snapshot_dim* and leaves no axis to chunk along. Default is ``1e9`` (1 GB).
+        :type memory_limit_bytes: float
+        :returns: The reconstructed snapshot(s). NumPy-backed or Dask-backed depending on *memory_limit_bytes*.
         :rtype: xarray.DataArray
 
         .. rubric:: Examples
@@ -124,6 +133,18 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
         .. code-block:: python
 
             tsvd.reconstruct("2017-01-01")
+
+        Reconstruct a range of snapshots by label:
+
+        .. code-block:: python
+
+            tsvd.reconstruct(slice("2017-01-01", "2017-01-31"))
+
+        Reconstruct the entire training dataset:
+
+        .. code-block:: python
+
+            tsvd.reconstruct()
 
         Reconstruct a snapshot from an array whose snapshot dimension is not named ``"time"``:
 
