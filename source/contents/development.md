@@ -5,19 +5,19 @@
 To build the Sphinx documentation, first install the documentation dependencies:
 
 ```bash
-pip install -e ".[docs]"
+uv sync --extra docs
 ```
 
 Then build the HTML documentation:
 
 ```bash
-make html
+uv run make html
 ```
 
 The built HTML documentation will be in `build/html/`. You can view available build targets with:
 
 ```bash
-make help
+uv run make help
 ```
 
 ## Testing
@@ -25,7 +25,7 @@ make help
 Use pytest to run the unit checks:
 
 ```bash
-pytest
+uv run pytest
 ```
 
 ## Coverage
@@ -33,13 +33,13 @@ pytest
 Use pytest-cov to generate coverage reports:
 
 ```bash
-pytest --cov=svdrom
+uv run pytest --cov=svdrom
 ```
 
 You can generate a HTML coverage report that you can open in your browser by running:
 
 ```bash
-coverage html
+uv run coverage html
 ```
 
 ## Pre-commit
@@ -47,7 +47,7 @@ coverage html
 This project uses pre-commit for all style checking. Install pre-commit and run:
 
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 to check all files.

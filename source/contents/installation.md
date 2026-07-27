@@ -1,13 +1,15 @@
 # Installation
 
+It is strongly recommended to use [uv](https://docs.astral.sh/uv/) to install SVD-ROM. Please [install uv](https://docs.astral.sh/uv/getting-started/installation/) before proceeding.
+
 Install the package from source by cloning the GitHub repository:
 
-```
+```bash
 git clone https://github.com/SVDROM/svdrom
 cd svdrom
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-python -m pip install .
+uv pip install .
 ```
 
 ## Optional dependencies
@@ -20,16 +22,18 @@ You can install additional optional dependencies specified under `project.option
 
 For example, to install dependencies for weather and climate analysis:
 
-```
-python -m pip install ".[weather]"
+```bash
+uv pip install ".[weather]"
 ```
 
 To install development dependencies:
 
-```
-python -m pip install ".[dev]"
+```bash
+uv pip install ".[dev]"
 ```
 
-## Using uv
+You can combine multiple extras in a single command:
 
-It is highly recommended to use [uv](https://docs.astral.sh/uv/getting-started/features/#the-pip-interface) to install SVD-ROM.
+```bash
+uv pip install ".[dev,weather]"
+```
