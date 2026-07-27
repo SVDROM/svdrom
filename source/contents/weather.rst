@@ -104,7 +104,7 @@ The weather utilities module provides metrics and tools commonly used in weather
     Compute the zonal energy spectrum along lines of constant latitude as a function of wavenumber, frequency, and wavelength. The spectrum is computed using WeatherBench2.
 
     .. note::
-        This function requires the optional ``extras`` dependencies. Install them with: ``pip install "svdrom[extras]"``.
+        This function requires the optional ``weather`` dependencies. Install them with: ``pip install "svdrom[weather]"``.
 
     :param data: The variable on a lat/lon grid for which to compute the energy spectrum. Must be backed by a NumPy array.
     :type data: xarray.DataArray
