@@ -14,14 +14,15 @@ python -m pip install .
 
 You can install additional optional dependencies specified under `project.optional-dependencies` in `pyproject.toml`. The available extras are:
 
-- `extras`: dependencies for weather and climate analysis (Cartopy, WeatherBench2, properscoring).
+- `weather`: dependencies for weather and climate analysis (Cartopy, WeatherBench2, properscoring).
 - `dev`: development and testing dependencies (pytest, pre-commit).
 - `docs`: documentation build dependencies (Sphinx, MyST-Parser).
 
 For example, to install dependencies for weather and climate analysis:
 
 ```
-python -m pip install ".[extras]"
+python -m pip install ".[weather]"
+```
 ```
 
 To install development dependencies:
