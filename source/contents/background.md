@@ -78,7 +78,7 @@ The result of a randomized projection + TSQR is an approximate SVD of $\mathbf{X
 
 ## Proper Orthogonal Decomposition
 
-[Proper Orthogonal Decomposition](https://en.wikipedia.org/wiki/Principal_component_analysis) (POD) is a direct application of the SVD to a spatio-temporal field, and is the classical modal decomposition used in fluid dynamics.
+[Proper Orthogonal Decomposition](https://en.wikipedia.org/wiki/Proper_orthogonal_decomposition) (POD) is a direct application of the SVD to a spatio-temporal field, and is the classical modal decomposition used in fluid dynamics.
 Given the (optionally mean-removed) fluctuating snapshot matrix $\mathbf{X}'$, POD seeks a set of orthonormal spatial modes $\boldsymbol{\phi}_j$ that are optimal in the sense that, for any truncation rank $k$, they capture more of the field's energy (variance) than any other linear basis.
 The field is then represented as
 
