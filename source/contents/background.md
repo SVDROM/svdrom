@@ -92,8 +92,8 @@ The fluctuating matrix is scaled by $1/\sqrt{n}$ (with $n$ the number of snapsho
 
 ### Extended POD
 
-Extended POD [9] correlates the POD modes of a primary field (e.g. a velocity field) with a second quantity $C$ (e.g. temperature or pressure) measured simultaneously in time.
-The extended POD modes are obtained by projecting the fluctuating field $C'$ onto the primary field's time coefficients:
+Extended POD [5] correlates the POD modes of a primary field (e.g. a velocity field) with a second quantity $\mathbf{C}$ (e.g. temperature or pressure) measured simultaneously in time.
+The extended POD modes are obtained by projecting the fluctuating field $\mathbf{C}'$ onto the primary field's time coefficients:
 
 $$
 \boldsymbol{\chi}_j = \frac{1}{\lambda_j\, N} \sum_{i} a_{ij}\, \mathbf{c}_i',
@@ -104,7 +104,7 @@ Unlike the POD spatial modes, the extended POD modes are not unit-norm; their no
 
 ## Dynamic Mode Decomposition
 
-[Dynamic Mode Decomposition](https://en.wikipedia.org/wiki/Dynamic_mode_decomposition) (DMD) extends the ROM framework of SVD to time-resolved data by extracting coherent spatio-temporal structures and their associated dynamics [5].
+[Dynamic Mode Decomposition](https://en.wikipedia.org/wiki/Dynamic_mode_decomposition) (DMD) extends the ROM framework of SVD to time-resolved data by extracting coherent spatio-temporal structures and their associated dynamics [6].
 The SVD by itself does not extract temporal correlation from the data.
 For instance, one could shuffle the temporal order of the columns in the spatio-temporal matrix $\mathbf{X}$ and would obtain the same modes and associated singular values.
 SVD can be understood as only performing dimensionality reduction along the spatial direction.
@@ -118,16 +118,16 @@ $$
 
 where $\mathbf{\Phi}$ is the $(m \times k)$ matrix of DMD modes, $\mathbf{B}$ is the ($k \times k$) diagonal matrix of mode amplitudes, and $\mathbf{T}(\boldsymbol{\omega})$ is the $(k \times n)$ matrix of temporal dynamics of the form $e^{\omega_j t}$, where the $j^{th}$ row contains the time evolution of the $j^{th}$ DMD mode governed by complex frequency $\omega_j$.
 
-To compute the DMD modes and associated dynamics, the exact DMD algorithm [5] seeks the leading spectral decomposition of the best-fit linear operator $\mathbf{A}$ that advances $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
+To compute the DMD modes and associated dynamics, the exact DMD algorithm [6] seeks the leading spectral decomposition of the best-fit linear operator $\mathbf{A}$ that advances $\mathbf{X}$ to its time-shifted version $\mathbf{X}'$:
 
 $$
 \mathbf{X}' = \mathbf{A} \mathbf{X}
 $$
 
 DMD is closely related to Koopman spectral theory.
-While DMD is fundamentally a linear approximation, it can approximate the [Koopman operator](https://en.wikipedia.org/wiki/Composition_operator), which allows nonlinear dynamics to be represented in an infinite-dimensional linear framework [6].
+While DMD is fundamentally a linear approximation, it can approximate the [Koopman operator](https://en.wikipedia.org/wiki/Composition_operator), which allows nonlinear dynamics to be represented in an infinite-dimensional linear framework [7].
 
-The figure below, reproduced from [6], shows the result of applying DMD to a time-series of snapshots of a cylinder in a cross-flow.
+The figure below, reproduced from [7], shows the result of applying DMD to a time-series of snapshots of a cylinder in a cross-flow.
 The extracted DMD modes represent spatial patterns that are accompanied by corresponding temporal dynamics (with a frequency of oscillation and a growth or decay rate).
 These dynamics can be extrapolated into the future, enabling the use of DMD for forecasting.
 
@@ -141,7 +141,7 @@ These dynamics can be extrapolated into the future, enabling the use of DMD for 
 As discussed above, exact DMD (the original DMD implementation) seeks the leading spectral decomposition of the operator $\mathbf{A}$.
 However, it is known to be strongly affected by the presence of noise, which is always present in real-world datasets.
 Additionally, exact DMD requires that the snapshots in $\mathbf{X}$ are evenly sampled in time.
-Optimized DMD (OptDMD) [7] is a non-linear optimization of DMD enabled by variable projection methods.
+Optimized DMD (OptDMD) [8] is a non-linear optimization of DMD enabled by variable projection methods.
 It avoids much of the bias of exact DMD, it is robust to noise and can handle snapshots that are unevenly sampled in time.
 OptDMD solves the exponential fitting problem directly:
 
@@ -163,7 +163,7 @@ This is the approach that has been implemented in SVD-ROM.
 
 ### DMD with Uncertainty Quantification
 
-An enhancement built on top of the OptDMD algorithm is Bagging, Optimized DMD (BOP-DMD) [8].
+An enhancement built on top of the OptDMD algorithm is Bagging, Optimized DMD (BOP-DMD) [9].
 BOP-DMD produces an ensemble of OptDMD models using statistical bootstrap aggregation (bagging).
 Each ensemble member is built by fitting an OptDMD model to a random sub-sample of snapshots from the matrix $\mathbf{X}$.
 This is possible thanks to the ability of OptDMD to handle snapshots unevenly sampled in time.
@@ -184,12 +184,12 @@ As a result, by implementing the acceleration technique discussed above (scalabl
 
 [4] Benson, A. R., Gleich, D. F., Demmel, J. (2013). Direct QR factorizations for tall-and-skinny matrices in MapReduce architectures. 2013 IEEE International Conference on Big Data, 264-272.
 
-[5] Schmid, P. J. (2022). Dynamic Mode Decomposition and Its Variants. Annual Review of Fluid Mechanics 54, 225-254.
+[5] Borée, J. (2003). Extended proper orthogonal decomposition: a tool to analyse correlated events in turbulent flows. Experiments in Fluids, 35(2), 188-192.
 
-[6] Kutz, J. N., Brunton, S. L., Brunton, B. W., Proctor, J. L. (2016). Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems.
+[6] Schmid, P. J. (2022). Dynamic Mode Decomposition and Its Variants. Annual Review of Fluid Mechanics 54, 225-254.
 
-[7] Askham, T., & Kutz, J. N. (2018). Variable Projection Methods for an Optimized Dynamic Mode Decomposition. SIAM Journal on Applied Dynamical Systems, 17(1), 380-416.
+[7] Kutz, J. N., Brunton, S. L., Brunton, B. W., Proctor, J. L. (2016). Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems.
 
-[8] Sashidhar, D., & Kutz, J. N. (2022). Bagging, optimized dynamic mode decomposition for robust, stable forecasting with spatial and temporal uncertainty quantification. Phil. Trans. R. Soc. A 380: 20210199.
+[8] Askham, T., & Kutz, J. N. (2018). Variable Projection Methods for an Optimized Dynamic Mode Decomposition. SIAM Journal on Applied Dynamical Systems, 17(1), 380-416.
 
-[9] Borée, J. (2003). Extended proper orthogonal decomposition: a tool to analyse correlated events in turbulent flows. Experiments in Fluids, 35(2), 188-192.
+[9] Sashidhar, D., & Kutz, J. N. (2022). Bagging, optimized dynamic mode decomposition for robust, stable forecasting with spatial and temporal uncertainty quantification. Phil. Trans. R. Soc. A 380: 20210199.
