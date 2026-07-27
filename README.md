@@ -23,7 +23,7 @@ SVD-ROM is an open-source project that originated at [The Alan Turing Institute 
 
 Intall SVD-ROM from source:
 ```bash
-git clone https://github.com/dsj976/svdrom
+git clone https://github.com/SVDROM/svdrom
 cd svdrom
 python -m pip install .
 ```
@@ -68,8 +68,8 @@ Distributed under the terms of the [MIT license](LICENSE).
 
 
 <!-- prettier-ignore-start -->
-[actions-badge]:            https://github.com/dsj976/svdrom/workflows/CI/badge.svg
-[actions-link]:             https://github.com/dsj976/svdrom/actions
+[actions-badge]:            https://github.com/SVDROM/svdrom/workflows/CI/badge.svg
+[actions-link]:             https://github.com/SVDROM/svdrom/actions
 [pypi-link]:                https://pypi.org/project/svdrom/
 [pypi-platforms]:           https://img.shields.io/pypi/pyversions/svdrom
 [pypi-version]:             https://img.shields.io/pypi/v/svdrom
