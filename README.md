@@ -3,6 +3,7 @@
 [![Actions Status][actions-badge]][actions-link]
 [![PyPI version][pypi-version]][pypi-link]
 [![PyPI platforms][pypi-platforms]][pypi-link]
+[![Documentation Status][rtd-badge]][rtd-link]
 
 A Python package for the application of Reduced Order Modeling (ROM) to large spatio-temporal datasets using the Singular Value Decomposition (SVD).
 A spatio-temporal dataset is one that has both spatial and temporal dimensions, such as weather or climate data, or a numerical simulation of flow past a circular cylinder.
@@ -34,6 +35,11 @@ uv venv
 source .venv/bin/activate
 uv pip install .
 ```
+
+## Documentation
+
+The documentation is built with [Sphinx](https://www.sphinx-doc.org/) from the `source/` directory and hosted on [Read the Docs][rtd-link].
+See [source/contents/development.md](source/contents/development.md) for instructions on building it locally.
 
 ## Usage
 
@@ -73,4 +79,6 @@ Distributed under the terms of the [MIT license](LICENSE).
 [pypi-link]:                https://pypi.org/project/svdrom/
 [pypi-platforms]:           https://img.shields.io/pypi/pyversions/svdrom
 [pypi-version]:             https://img.shields.io/pypi/v/svdrom
+[rtd-badge]:                https://readthedocs.org/projects/svdrom/badge/?version=latest
+[rtd-link]:                 https://svdrom.readthedocs.io/en/latest/
 <!-- prettier-ignore-end -->
