@@ -15,7 +15,7 @@ Each column therefore represents a snapshot of the system at time $t$.
 Typically, we have many more spatial locations than we have temporal snapshots, so these matrices are typically *tall-and-skinny*.
 This is especially the case with Computational Fluid Dynamics (CFD) datasets, particularly with high fidelity simulations where the computational meshes can contain millions or tens of millions of cells, while typically only a few hundred snapshots are extracted for transient analysis.
 In weather and climate modeling, the situation is somewhat different because the time period over which the data is sampled is typically measured in years or decades, and the temporal resolution can be as small as 6-hourly.
-As a result, while the spatial dimension typically still dominates (particularly for global weather models), we might end up with thousands or event tens of thousands of temporal snapshots.
+As a result, while the spatial dimension typically still dominates (particularly for global weather models), we might end up with thousands or even tens of thousands of temporal snapshots.
 In these situations we might classify the resulting matrix $\mathbf{X}$ as *moderately wide*, rather than strictly tall-and-skinny.
 
 An illustration of what the spatio-temporal matrix would look like is given below.
