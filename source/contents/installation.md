@@ -23,7 +23,6 @@ For example, to install dependencies for weather and climate analysis:
 ```
 python -m pip install ".[weather]"
 ```
-```
 
 To install development dependencies:
 

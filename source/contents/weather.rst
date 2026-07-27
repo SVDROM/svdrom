@@ -132,7 +132,7 @@ The weather utilities module provides metrics and tools commonly used in weather
     Compute the Continuous Ranked Probability Score (CRPS) for a probabilistic forecast, assuming a Gaussian distribution.
 
     .. note::
-        This function requires the optional ``extras`` dependencies. Install them with: ``pip install "svdrom[extras]"``.
+        This function requires the optional ``weather`` dependencies. Install them with: ``pip install "svdrom[weather]"``.
 
     :param ground_truth: The ground truth data. Must be a NumPy-backed array.
     :type ground_truth: xarray.DataArray
