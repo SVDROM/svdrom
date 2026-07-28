@@ -7,12 +7,13 @@ build:
   os: ubuntu-24.04
   tools:
     python: "3.12"  # must satisfy requires-python in pyproject.toml
-  jobs:
-    create_environment:
-      - python -m pip install uv
-      - uv venv "${READTHEDOCS_VIRTUALENV_PATH}"
-    install:
-      - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv sync --extra docs
+
+python:
+  install:
+    - method: uv
+      command: sync
+      extras:
+        - docs
 
 sphinx:
   configuration: source/conf.py
