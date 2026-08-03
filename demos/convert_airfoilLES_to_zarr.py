@@ -5,6 +5,8 @@ ux/uy/uz for one timestep, over an unstructured point cloud shared across all
 snapshots (defined in airfoilLES_grid.h5). This script stacks all snapshots
 into (time, point) Zarr arrays, chunked only along time, so the result opens
 cleanly as a Dask-backed xarray.Dataset via `xr.open_zarr(..., chunks={})`.
+The time coordinate is physical time (in the units of `dt`), starting at 0
+and spaced by the timestep `dt` from airfoilLES_parameters.h5.
 """
 
 import glob
@@ -17,6 +19,7 @@ import numpy as np
 import xarray as xr
 
 GRID_PATH = "data/airfoilLES/airfoilLES_grid.h5"
+PARAMS_PATH = "data/airfoilLES/airfoilLES_parameters.h5"
 SNAPSHOT_DIR = "data/airfoilLES/airfoilLES_midspan"
 STORE_PATH = "data/airfoilLES/airfoilLES_midspan.zarr"
 CHUNK_TIME = 100  # timesteps per chunk; chunking is along time only
@@ -30,8 +33,12 @@ def snapshot_index(path):
 
 def main():
     files = sorted(glob.glob(f"{SNAPSHOT_DIR}/*.h5"), key=snapshot_index)
-    times = np.array([snapshot_index(f) for f in files])
+    steps = np.array([snapshot_index(f) for f in files])
     ntime = len(files)
+
+    with h5py.File(PARAMS_PATH, "r") as f:
+        dt = f["dt"][0]
+    times = (steps - steps[0]) * dt
 
     with h5py.File(GRID_PATH, "r") as f:
         x = f["x"][:]
@@ -86,7 +93,7 @@ def main():
         eta = (n_chunks - i - 1) / rate if rate > 0 else float("nan")
         print(
             f"chunk {i + 1}/{n_chunks} "
-            f"(timesteps {times[start]}-{times[stop - 1]}) written "
+            f"(t={times[start]:.4f}-{times[stop - 1]:.4f}) written "
             f"[{elapsed:.0f}s elapsed, ~{eta:.0f}s remaining]"
         )
 
