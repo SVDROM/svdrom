@@ -47,6 +47,11 @@ weather = [
   "weatherbench2 @ git+https://github.com/google-research/weatherbench2.git",
   "properscoring @ git+https://github.com/SVDROM/properscoring.git",
 ]
+demos = [
+  "jupyter",
+  "matplotlib",
+  "h5py",
+]
 docs = [
   "sphinx",
   "myst-parser",
