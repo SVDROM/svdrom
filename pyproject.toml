@@ -51,6 +51,7 @@ demos = [
   "jupyter",
   "matplotlib",
   "h5py",
+  "scipy",
 ]
 docs = [
   "sphinx",

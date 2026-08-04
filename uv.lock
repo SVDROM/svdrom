@@ -4925,6 +4925,9 @@ demos = [
     { name = "jupyter" },
     { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 dev = [
     { name = "pre-commit" },
@@ -4961,6 +4964,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=3" },
     { name = "pytest-dependency", marker = "extra == 'dev'" },
+    { name = "scipy", marker = "extra == 'demos'" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "weatherbench2", marker = "extra == 'weather'", git = "https://github.com/google-research/weatherbench2.git" },
     { name = "xarray", extras = ["complete"] },
