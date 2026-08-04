@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=2000"]
+        exclude: ^demos/media/(ux_original|ux_reconstruct)\.gif$
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
