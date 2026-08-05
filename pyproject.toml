@@ -135,4 +135,5 @@ unfixable = [
   "F401",   # Would remove unused imports
   "F841",   # Would remove unused variables
 ]
-flake8-unused-arguments.ignore-variadic-names = true  # allow unused *args/**kwargsisort.required-imports = ["from __future__ import annotations"]
+flake8-unused-arguments.ignore-variadic-names = true  # allow unused *args/**kwargs
+isort.required-imports = ["from __future__ import annotations"]

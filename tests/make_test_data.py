@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import xarray as xr
 from numpy.lib.stride_tricks import sliding_window_view
@@ -157,7 +159,7 @@ class SignalGenerator:
 
     def add_sinusoid1(
         self, a: float = 1, k: float = 0.1, omega: float = 1, gamma: float = 0
-    ) -> "SignalGenerator":
+    ) -> SignalGenerator:
         """Add a sinusoidal signal of the form:
         a*sin(k*x - omega*t)*exp(gamma*t)
 
@@ -189,7 +191,7 @@ class SignalGenerator:
 
     def add_sinusoid2(
         self, a: float = 1, k: float = 0.2, omega: float = 1, c: float = 0
-    ) -> "SignalGenerator":
+    ) -> SignalGenerator:
         """Add a sinusoidal signal of the form:
         a*(exp(-k*(x+c)^2)*cos(omega*t)
 
@@ -216,7 +218,7 @@ class SignalGenerator:
 
     def add_noise(
         self, noise_std: float = 0.1, random_seed: int | None = None
-    ) -> "SignalGenerator":
+    ) -> SignalGenerator:
         """Add Gaussian noise to the signal.
 
         Parameters
@@ -231,7 +233,7 @@ class SignalGenerator:
         self.da = self.da.copy(data=self.da.values + noise)
         return self
 
-    def _apply_delay_embedding(self, delay: int = 2) -> "SignalGenerator":
+    def _apply_delay_embedding(self, delay: int = 2) -> SignalGenerator:
         """Apply delay embedding to the matrix of snapshots.
         For an input matrix of shape (n_samples, n_snapshots),
         delay embedding results in a matrix of shape
@@ -259,7 +261,7 @@ class SignalGenerator:
 
     def generate_signal(
         self, noise_std: float = 0.2, random_seed: int | None = None
-    ) -> "SignalGenerator":
+    ) -> SignalGenerator:
         """Generate signal with three superimposed sinusoids and
         white noise.
         """
@@ -275,7 +277,7 @@ class SignalGenerator:
         noise_std: float = 0.2,
         random_seed: int | None = None,
         apply_delay_embedding: bool = True,
-    ) -> "SignalGenerator":
+    ) -> SignalGenerator:
         """Compute the U, S and V matrices resulting from the SVD
         of the signal. If no signal has been computed, a predefined
         signal consisting of 3 sinusoids and white noise is

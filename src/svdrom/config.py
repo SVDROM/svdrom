@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 _fixed_config = {
     "hankel_coord_name": "hankel_lag",
     "hankel_time_mapping_attr": "hankel_time_mapping",
