@@ -9,7 +9,7 @@ def compute_rmse(
     ground_truth: xr.DataArray,
     prediction: xr.DataArray,
     lat_weighting: bool = True,
-    dims: str | tuple[str, ...] = ("latitude", "longitude"),
+    dims: str | tuple[str, ...] | None = ("latitude", "longitude"),
 ) -> xr.DataArray:
     """Compute the Root Mean Squared Error (RMSE) of a prediction,
     averaging along the specified dimension(s).
@@ -27,10 +27,11 @@ def compute_rmse(
         Whether to apply a weighting function so that spatial locations
         in a lat/lon grid closer to the Equator receive a larger weight
         than those closer to the poles. Default is True.
-    dims: str | tuple[str], optional
+    dims: str | tuple[str] | None, optional
         Dimensions along which to average the RMSE. The default is
         ("latitude", "longitude"), which would return the RMSE as a function
-        of prediction time (assuming a single pressure level).
+        of prediction time (assuming a single pressure level). Set to None
+        if you don't want to perform averaging.
 
     Returns
     -------
@@ -64,14 +65,16 @@ def compute_rmse(
         raise ValueError(msg) from e
     prediction = prediction.real  # keep only real part of the prediction
     squared_error = ground_truth.copy(data=(ground_truth - prediction) ** 2)
-    if lat_weighting:
+    if lat_weighting and dims is not None:
         if "latitude" not in ground_truth.dims:
             msg = "Expected the input data to have a dimension named latitude."
             raise ValueError(msg)
         lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
         rmse = squared_error.weighted(lat_weights).mean(dim=dims)
-    else:
+    elif dims is not None:
         rmse = squared_error.mean(dim=dims)
+    else:
+        rmse = squared_error
     rmse = rmse.clip(min=0)
     return rmse**0.5
 
@@ -80,7 +83,7 @@ def compute_mae(
     ground_truth: xr.DataArray,
     prediction: xr.DataArray,
     lat_weighting: bool = True,
-    dims: str | tuple[str, ...] = ("latitude", "longitude"),
+    dims: str | tuple[str, ...] | None = ("latitude", "longitude"),
 ) -> xr.DataArray:
     """Compute the Mean Absolute Error (MAE) of a prediction,
     averaging along the specified dimension(s).
@@ -98,10 +101,11 @@ def compute_mae(
         Whether to apply a weighting function so that spatial locations
         in a lat/lon grid closer to the Equator receive a larger weight
         than those closer to the poles. Default is True.
-    dims: str | tuple[str], optional
+    dims: str | tuple[str] | None, optional
         Dimensions along which to average the MAE. The default is
         ("latitude", "longitude"), which would return the MAE as a function
-        of prediction time (assuming a single pressure level).
+        of prediction time (assuming a single pressure level). Set to None
+        if you don't want to perform averaging.
 
     Returns
     -------
@@ -126,14 +130,16 @@ def compute_mae(
         raise ValueError(msg) from e
     prediction = prediction.real  # keep only real part of the prediction
     absolute_error = ground_truth.copy(data=np.abs(ground_truth - prediction))
-    if lat_weighting:
+    if lat_weighting and dims is not None:
         if "latitude" not in ground_truth.dims:
             msg = "Expected the input data to have a dimension named latitude."
             raise ValueError(msg)
         lat_weights = np.cos(np.deg2rad(ground_truth.latitude))
         mae = absolute_error.weighted(lat_weights).mean(dim=dims)
-    else:
+    elif dims is not None:
         mae = absolute_error.mean(dim=dims)
+    else:
+        mae = absolute_error
     return mae.clip(min=0)
 
 
