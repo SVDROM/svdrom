@@ -110,7 +110,10 @@ def test_compute_rmse(dims, data_generator):
     expected_rmse = xr.ufuncs.sqrt(expected_rmse)  # root
 
     xr.testing.assert_allclose(rmse, expected_rmse)
-    assert set(rmse.dims) == set(expected_out_dims)
+    assert set(rmse.dims) == set(expected_out_dims), (
+        f"Expected dimensions of RMSE to be {expected_out_dims}, "
+        f"but got {rmse.dims} instead."
+    )
 
 
 @pytest.mark.parametrize(
@@ -157,8 +160,14 @@ def test_compute_rmse_mae_no_averaging(lat_weighting, data_generator):
 
     xr.testing.assert_allclose(rmse, np.abs(prediction - groundtruth))
     xr.testing.assert_allclose(mae, np.abs(prediction - groundtruth))
-    assert set(rmse.dims) == set(groundtruth.dims)
-    assert set(mae.dims) == set(groundtruth.dims)
+    assert set(rmse.dims) == set(groundtruth.dims), (
+        f"Expected dimensions of RMSE to be unchanged at {groundtruth.dims}, "
+        f"but got {rmse.dims} instead."
+    )
+    assert set(mae.dims) == set(groundtruth.dims), (
+        f"Expected dimensions of MAE to be unchanged at {groundtruth.dims}, "
+        f"but got {mae.dims} instead."
+    )
 
 
 @pytest.mark.dependency(name="compute_clima")
