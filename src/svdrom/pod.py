@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dask.array as da
 import numpy as np
 import xarray as xr
@@ -143,7 +145,7 @@ class POD(TruncatedSVD):
         self,
         X: xr.DataArray,
         **kwargs,
-    ) -> "POD":
+    ) -> POD:
         """Fit the POD model to the input array.
 
         Parameters

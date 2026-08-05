@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from svdrom._pydmd_compat import precompile_pydmd
 
 

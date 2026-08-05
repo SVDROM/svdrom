@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dask.distributed import Client
 
 from svdrom.logger import setup_logger

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dask
 import dask.array as da
 import numpy as np

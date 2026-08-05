@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 import xarray as xr
@@ -23,7 +25,7 @@ class DecompositionModel(ABC):
         self._n_components = n_components
 
     @abstractmethod
-    def fit(self, *args, **kwargs) -> "DecompositionModel":
+    def fit(self, *args, **kwargs) -> DecompositionModel:
         """Fit the model to the data.
 
         Parameters

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from typing import Literal, cast
 
@@ -546,7 +548,7 @@ class OptDMD(DecompositionModel):
 
     def _extract_results(
         self, bopdmd: BOPDMD, u: xr.DataArray, v: xr.DataArray
-    ) -> "OptDMD":
+    ) -> OptDMD:
         """Given the fitted BOPDMD instance, the left singular vectors
         containing the spatial information, and the right singular vectors
         containing the temporal information, store them in the instance attributes.
@@ -574,9 +576,7 @@ class OptDMD(DecompositionModel):
 
         return self
 
-    def fit(
-        self, u: xr.DataArray, s: np.ndarray, v: xr.DataArray, **kwargs
-    ) -> "OptDMD":
+    def fit(self, u: xr.DataArray, s: np.ndarray, v: xr.DataArray, **kwargs) -> OptDMD:
         """Fit the OptDMD model to the results of a Singular Value Decomposition (SVD).
         If you have requested bagging when instantiating the model, "num_trials" OptDMD
         trials will be fitted by randomly subsampling snapshots of the data, and the

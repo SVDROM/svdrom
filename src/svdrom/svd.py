@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dask
 import dask.array as da
 import numpy as np
@@ -240,7 +242,7 @@ class TruncatedSVD(DecompositionModel):
         self,
         X: xr.DataArray,
         **kwargs,
-    ) -> "TruncatedSVD":
+    ) -> TruncatedSVD:
         """Fit the SVD model to the input array.
 
         Parameters

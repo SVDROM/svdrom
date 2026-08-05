@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import xarray as xr
 
 from svdrom.logger import setup_logger
