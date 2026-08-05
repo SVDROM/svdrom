@@ -24,6 +24,7 @@ This is achieved by using scalable implementations of the ROM algorithms, and by
    contents/preprocessing
    contents/weather
    contents/data_loading
+   contents/dask
    contents/configuration
    contents/utilities
    contents/development
