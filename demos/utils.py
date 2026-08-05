@@ -1,5 +1,7 @@
 """Some utility functions for the demos."""
 
+from __future__ import annotations
+
 import os
 from datetime import datetime, timedelta
 

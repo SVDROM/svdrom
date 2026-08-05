@@ -23,7 +23,8 @@ This is achieved by using scalable implementations of the ROM algorithms, and by
    contents/dmd
    contents/preprocessing
    contents/weather
-   contents/io
+   contents/data_loading
+   contents/dask
    contents/configuration
    contents/utilities
    contents/development
