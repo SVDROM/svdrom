@@ -67,6 +67,7 @@ Distributed under the terms of the [MIT license](LICENSE).
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/LydiaFrance"><img src="https://avatars.githubusercontent.com/u/85945427?v=4?s=100" width="100px;" alt="Lydia France"/><br /><sub><b>Lydia France</b></sub></a><br /><a href="#research-LydiaFrance" title="Research">🔬</a> <a href="#ideas-LydiaFrance" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ots22"><img src="https://avatars.githubusercontent.com/u/5434836?v=4?s=100" width="100px;" alt="ots22"/><br /><sub><b>ots22</b></sub></a><br /><a href="#research-ots22" title="Research">🔬</a> <a href="#ideas-ots22" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://www.yatsyshin.com/"><img src="https://avatars.githubusercontent.com/u/20075514?v=4?s=100" width="100px;" alt="Peter Yatsyshin"/><br /><sub><b>Peter Yatsyshin</b></sub></a><br /><a href="#research-pyatsysh" title="Research">🔬</a> <a href="#ideas-pyatsysh" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/bef-18"><img src="https://avatars.githubusercontent.com/u/61317743?v=4?s=100" width="100px;" alt="bef-18"/><br /><sub><b>bef-18</b></sub></a><br /><a href="#ideas-bef-18" title="Ideas, Planning, & Feedback">🤔</a> <a href="#research-bef-18" title="Research">🔬</a></td>
     </tr>
   </tbody>
 </table>
