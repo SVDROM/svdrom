@@ -12,9 +12,8 @@ from pydmd import BOPDMD
 from pydmd.preprocessing import hankel_preprocessing as hankel_preprocessing_pydmd
 
 import svdrom.config as config
-from svdrom.dmd import OptDMD
+from svdrom import OptDMD, TruncatedSVD
 from svdrom.preprocessing import hankel_preprocessing
-from svdrom.svd import TruncatedSVD
 
 # set the dask scheduler to single-threaded
 dask.config.set(scheduler="single-threaded")
