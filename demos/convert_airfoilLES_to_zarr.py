@@ -9,6 +9,8 @@ The time coordinate is physical time (in the units of `dt`), starting at 0
 and spaced by the timestep `dt` from airfoilLES_parameters.h5.
 """
 
+from __future__ import annotations
+
 import glob
 import re
 import time
