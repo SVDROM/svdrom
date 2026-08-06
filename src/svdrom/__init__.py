@@ -38,4 +38,4 @@ def __getattr__(name: str) -> object:
 
 def __dir__() -> list[str]:
     """Return the public names exported by this package."""
-    return list(__all__)
+    return sorted(set(globals()) | set(__all__))
