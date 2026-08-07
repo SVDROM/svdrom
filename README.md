@@ -1,6 +1,8 @@
 <!-- markdownlint-disable MD033 MD041 -->
+<!-- Logo URL is pinned to a commit SHA so it renders on GitHub and on PyPI, which
+     cannot resolve relative paths. Bump the SHA if the logo image is ever replaced. -->
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SVDROM/svdrom/main/source/media/svdrom-logo.png" alt="SVD-ROM logo" width="220">
+  <img src="https://raw.githubusercontent.com/SVDROM/svdrom/bde2284287089eeba0db173c835e76ecdaf34b5c/source/media/svdrom-logo.png" alt="SVD-ROM logo" width="220">
 </p>
 <!-- markdownlint-restore -->
 
