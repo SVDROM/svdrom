@@ -1,3 +1,9 @@
+<!-- markdownlint-disable MD033 MD041 -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SVDROM/svdrom/main/source/media/svdrom-logo.png" alt="SVD-ROM logo" width="220">
+</p>
+<!-- markdownlint-restore -->
+
 # SVD-ROM
 
 [![Actions Status][actions-badge]][actions-link]
