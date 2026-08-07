@@ -59,6 +59,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
 
 Distributed under the terms of the [MIT license](LICENSE).
 
+## Useful references
+
+The following references provide useful background information on SVD-ROM:
+
+* Salvador-Jasin, D., Vava, R., Strickson, O., van Zeeland, L., France, L., Eiximeno Franch, B., Yatsyshin, P., Hosking, S. & Kutz, J. N. (2026). SVD-ROM: Scalable Reduced Order Modeling of Weather and Climate Data Using the Singular Value Decomposition. Zenodo. Climate Informatics 2026, Lausanne (Switzerland). https://doi.org/10.5281/zenodo.19710711
+* Salvador Jasin, D. (2026, February 3). SVD-ROM: Reduced Order Modeling of huge arrays using the Singular Value Decomposition. Zenodo. PyData London Meetup, London. https://doi.org/10.5281/zenodo.18468075
+
 ## Contributors
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
