@@ -160,7 +160,8 @@ def test_fit_error_wrapped(svd_results, monkeypatch):
     u, s, v = svd_results
 
     def _boom(*args, **kwargs):
-        raise RuntimeError("boom")
+        msg = "boom"
+        raise RuntimeError(msg)
 
     monkeypatch.setattr("svdrom.dmd.BOPDMD.fit_econ", _boom)
     with pytest.raises(RuntimeError, match="Error computing the DMD fit"):
