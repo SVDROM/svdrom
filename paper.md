@@ -73,8 +73,8 @@ While `EZyRB` provides a broader ROM toolbox than `SVD-ROM`, it is not specifica
 ## Mathematics
 
 Spatio-temporal data is arranged into an $(m \times n)$ snapshot matrix $\mathbf{X}$, whose rows index spatial locations and whose columns index time, with $m \gg n$ in the extremely tall-and-skinny case typical of fluid dynamics and $m > n$ by a more moderate margin in weather and climate applications.
-Its SVD is $\mathbf{X} = \mathbf{U} \mathbf{\Sigma} \mathbf{V}^{*}$, where $\mathbf{U}$ and $\mathbf{V}$ hold the left and right singular vectors and $\mathbf{\Sigma}$ is the rectangular diagonal matrix whose entries are the singular values $\sigma_j$, ordered by decreasing magnitude.
-ROM proceeds by retaining only the leading $k$ singular values, giving the rank $k$ approximation $\mathbf{X}_k = \mathbf{U}_k \mathbf{\Sigma}_k \mathbf{V}_{k}^{*}$, which captures most of the variance of $\mathbf{X}$ when $k \ll n$.
+Its SVD is $\mathbf{X} = \mathbf{U} \boldsymbol{\Sigma} \mathbf{V}^{*}$, where $\mathbf{U}$ and $\mathbf{V}$ hold the left and right singular vectors and $\boldsymbol{\Sigma}$ is the rectangular diagonal matrix whose entries are the singular values $\sigma_j$, ordered by decreasing magnitude.
+ROM proceeds by retaining only the leading $k$ singular values, giving the rank $k$ approximation $\mathbf{X}_k = \mathbf{U}_k \boldsymbol{\Sigma}_k \mathbf{V}_{k}^{*}$, which captures most of the variance of $\mathbf{X}$ when $k \ll n$.
 
 POD is the direct application of the truncated SVD to the (optionally mean-removed) fluctuating field $\mathbf{X}'$, scaled by $1/\sqrt{n}$ so that modal energies do not depend on the number of snapshots:
 
@@ -82,19 +82,19 @@ $$
 \mathbf{X}'(\mathbf{x}, t) \approx \sum_{j=1}^{k} \boldsymbol{\phi}_j(\mathbf{x})\, a_j(t),
 $$
 
-where the orthonormal spatial modes $\boldsymbol{\phi}_j$ are the left singular vectors $\mathbf{U}_k$, the modal energies are $\lambda_j = \sigma_j^2$, and the time coefficients $a_j(t)$ follow from $\mathbf{\Sigma}_k \mathbf{V}_{k}^{*}$.
+where the orthonormal spatial modes $\boldsymbol{\phi}_j$ are the left singular vectors $\mathbf{U}_k$, the modal energies are $\lambda_j = \sigma_j^2$, and the time coefficients $a_j(t)$ follow from $\boldsymbol{\Sigma}_k \mathbf{V}_{k}^{*}$.
 Extended POD [@Boree:2003] correlates these modes with a second field $\mathbf{C}$ measured simultaneously in time, by projecting its fluctuating part onto the time coefficients as $\boldsymbol{\chi}_j = (\lambda_j n)^{-1} \sum_{i} a_{ij}\, \mathbf{c}_i'$, whose norm measures the energy in $\mathbf{C}'$ that is linearly correlated with mode $j$.
 
-DMD [@Schmid:2022] complements this purely spatial reduction by also extracting temporal dynamics, seeking a decomposition $\mathbf{X} \approx \mathbf{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega})$ into DMD modes $\mathbf{\Phi}$, amplitudes $\mathbf{B}$ and temporal dynamics $\mathbf{T}(\boldsymbol{\omega})$, whose $j$-th row is of the form $e^{\omega_j t}$ with $\omega_j$ the complex frequency (oscillation rate and growth or decay) governing the evolution of the $j$-th mode.
+DMD [@Schmid:2022] complements this purely spatial reduction by also extracting temporal dynamics, seeking a decomposition $\mathbf{X} \approx \boldsymbol{\Phi} \mathbf{B} \mathbf{T}(\boldsymbol{\omega})$ into DMD modes $\boldsymbol{\Phi}$, amplitudes $\mathbf{B}$ and temporal dynamics $\mathbf{T}(\boldsymbol{\omega})$, whose $j$-th row is of the form $e^{\omega_j t}$ with $\omega_j$ the complex frequency (oscillation rate and growth or decay) governing the evolution of the $j$-th mode.
 Because these dynamics are continuous in time, they can be extrapolated beyond the training window to produce forecasts.
 `SVD-ROM` uses Optimized DMD [@Askham:2018], which solves the exponential fitting problem directly by variable projection and is therefore robust to noise and to unevenly sampled snapshots.
 Crucially, the fit is performed in the SVD latent space,
 
 $$
-\tilde{\mathbf{\Phi}}\tilde{\mathbf{B}}, \tilde{\boldsymbol{\omega}} = \arg \min_{\tilde{\mathbf{\Phi}} \tilde{\mathbf{B}}, \tilde{\boldsymbol{\omega}}} || \mathbf{\Sigma}_k \mathbf{V}_k^{*} - \tilde{\mathbf{\Phi}} \tilde{\mathbf{B}} \mathbf{T}(\tilde{\boldsymbol{\omega}}) ||_F,
+\tilde{\boldsymbol{\Phi}}\tilde{\mathbf{B}}, \tilde{\boldsymbol{\omega}} = \arg \min_{\tilde{\boldsymbol{\Phi}} \tilde{\mathbf{B}}, \tilde{\boldsymbol{\omega}}} || \boldsymbol{\Sigma}_k \mathbf{V}_k^{*} - \tilde{\boldsymbol{\Phi}} \tilde{\mathbf{B}} \mathbf{T}(\tilde{\boldsymbol{\omega}}) ||_F,
 $$
 
-with the resulting $(k \times k)$ latent modes projected back to physical space via $\mathbf{\Phi} = \mathbf{U}_k \tilde{\mathbf{\Phi}}$.
+with the resulting $(k \times k)$ latent modes projected back to physical space via $\boldsymbol{\Phi} = \mathbf{U}_k \tilde{\boldsymbol{\Phi}}$.
 This encoder (truncated SVD) $\rightarrow$ processor (Optimized DMD) $\rightarrow$ decoder (orthogonal projection) framework is what allows `SVD-ROM` to fit DMD models, and their bagged counterparts with uncertainty quantification [@Sashidhar:2022], on snapshot matrices that are far too large to be handled directly.
 
 ## Software design
