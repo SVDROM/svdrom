@@ -39,9 +39,8 @@ bibliography: paper.bib
 
 Despite their high dimensionality, datasets in fluid dynamics, weather, and climate often exhibit low-rank structure, where a small number of dominant patterns explain most of the variability.
 Singular Value Decomposition (SVD)-based methods, such as the Proper Orthogonal Decomposition (POD) [@Berkooz:1993], provide efficient and interpretable tools for dimensionality reduction in such systems.
-Dynamic Mode Decomposition (DMD) [@Schmid:2022] extends this framework to time-resolved data by extracting coherent spatio-temporal structures and their associated dynamics.
-This enables the construction of low-dimensional, interpretable emulators of complex dynamical systems.
-However, the adoption of these methods is limited by the practical challenges of working with modern data volumes.
+Dynamic Mode Decomposition (DMD) [@Schmid:2022] extends this framework to time-resolved data by extracting coherent spatio-temporal structures and their associated dynamics, which enables the construction of low-dimensional, interpretable emulators of complex dynamical systems.
+However, the wide-scale adoption of these methods in some domains, for example for weather and climate applications, has been limited by the challenges of applying them to large data volumes.
 We present `SVD-ROM`, an open-source Python package for SVD-based Reduced Order Modeling (ROM), designed to operate efficiently on large datasets using parallel and out-of-core computation on standard hardware.
 
 ## Statement of need
@@ -54,7 +53,7 @@ In contrast to other packages, `SVD-ROM` is designed to operate on standard comp
 It is purely written in Python and does not require specialized configuration or compilation.
 It is designed to be accessible to researchers and practitioners without requiring deep expertise in high-performance computing, making it a practical choice for ROM of large multi-dimensional arrays.
 
-## State of the field
+## Related Work
 
 Several open-source packages exist for ROM of dynamical systems, but most are either not designed for large-scale data or require specialized hardware.
 This section provides a brief overview of some notable packages in the field.
@@ -70,9 +69,10 @@ While `SVD-ROM` is a data-centric/scalable ROM library, `pyMOR` is a model-centr
 Finally, `EZyRB` [@Demo:2018] is a general-purpose Python ROM framework focused on POD/reduced-basis methods and parametric model reduction, including interpolation of reduced-order solutions.
 While `EZyRB` provides a broader ROM toolbox than `SVD-ROM`, it is not specifically optimized for large-scale data processing.
 
-## Mathematics
+## Methods
 
-Spatio-temporal data is arranged into an $(m \times n)$ snapshot matrix $\mathbf{X}$, whose rows index spatial locations and whose columns index time, with $m \gg n$ in the extremely tall-and-skinny case typical of fluid dynamics and $m > n$ by a more moderate margin in weather and climate applications.
+Spatio-temporal data is arranged into an $(m \times n)$ snapshot matrix $\mathbf{X}$ whose rows index spatial locations and whose columns index time.
+Typical fluid dynamics applications have $m \gg n$ (the "tall-and-skinny" case), while weather and climate problems also have $m > n$ but with $m$ exceeding $n$ by a more moderate margin.
 Its SVD is $\mathbf{X} = \mathbf{U} \boldsymbol{\Sigma} \mathbf{V}^{*}$, where $\mathbf{U}$ and $\mathbf{V}$ hold the left and right singular vectors and $\boldsymbol{\Sigma}$ is the rectangular diagonal matrix whose entries are the singular values $\sigma_j$, ordered by decreasing magnitude.
 ROM proceeds by retaining only the leading $k$ singular values, giving the rank $k$ approximation $\mathbf{X}_k = \mathbf{U}_k \boldsymbol{\Sigma}_k \mathbf{V}_{k}^{*}$, which captures most of the variance of $\mathbf{X}$ when $k \ll n$.
 
@@ -95,20 +95,22 @@ $$
 $$
 
 with the resulting $(k \times k)$ latent modes projected back to physical space via $\boldsymbol{\Phi} = \mathbf{U}_k \tilde{\boldsymbol{\Phi}}$.
-This encoder (truncated SVD) $\rightarrow$ processor (Optimized DMD) $\rightarrow$ decoder (orthogonal projection) framework is what allows `SVD-ROM` to fit DMD models, and their bagged counterparts with uncertainty quantification [@Sashidhar:2022], on snapshot matrices that are far too large to be handled directly.
+This encoder (truncated SVD) $\rightarrow$ processor (Optimized DMD) $\rightarrow$ decoder (orthogonal projection) framework allows `SVD-ROM` to fit DMD models on snapshot matrices that are far too large to be handled directly, and is the key contribution of this work.
+
+In addition, it allows uncertainty quantification through bagging [@Sashidhar:2022].
 
 ## Software design
 
 `SVD-ROM` is built on top of `Xarray` [@Hoyer:2017] and `Dask` [@Rocklin:2015], and operates throughout on chunked, Dask-backed `Xarray` `DataArray` objects.
 This choice underpins both of the package's design goals.
-Firstly, labelled dimensions and coordinates mean that users work with named physical axes (e.g. time, latitude, longitude, etc.) rather than raw matrix indices, and are preserved across decomposition, reconstruction and forecasting.
+Firstly, labelled dimensions and coordinates mean that users work with named physical axes (for example, 'time', 'latitude' and 'longitude') rather than raw matrix indices, and are preserved across decomposition, reconstruction and forecasting.
 Secondly, the `Dask` backend provides the lazy, out-of-core and parallel execution that allows datasets larger than memory to be processed on a single machine, streaming from and to on-disk `Zarr` stores or `NetCDF` files.
 
 All models share a common interface through an abstract `DecompositionModel` base class exposing the `fit` and `reconstruct` methods.
 The computational core is the `TruncatedSVD` class, which offers a choice between a deterministic, communication-efficient QR factorization for tall-and-skinny matrices [@Benson:2013], and a randomized algorithm [@Halko:2011], trading accuracy for speed and relaxed chunking requirements on very large arrays.
 `POD` extends `TruncatedSVD` with the appropriate energy normalization, mean removal and extended-POD functionality.
 `OptDMD` consumes the pre-computed SVD factors directly and solves the resulting low-dimensional nonlinear least-squares problem via the variable-projection Optimized DMD algorithm of the `PyDMD` package, with optional parallelized bootstrap aggregation for uncertainty quantification [@Sashidhar:2022] and Hankel time-delay embedding [@Brunton:2017] for systems with insufficient rank.
-Because the singular triplet is computed once and reused, a single decomposition can feed several downstream Optimized DMD models at no additional cost.
+The singular value decomposition is computed once and reused, meaning that a single decomposition can feed several downstream Optimized DMD models at no additional cost.
 
 Throughout, users retain explicit control over what is materialized in memory: `compute_*` flags and companion methods make it possible to build a `Dask` computational graph and defer its evaluation, so that expensive quantities such as spatial modes or time coefficients are only computed when needed.
 The package is written in pure Python with no compilation or MPI configuration required, is fully type annotated, and ships optional extras for weather and climate workflows (`weather_utils`).
@@ -151,7 +153,7 @@ The `demos/` directory contains extended versions of this workflow, including re
 
 ## Research impact statement
 
-`SVD-ROM` was developed as part of the Environmental Forecasting mission at The Alan Turing Institute in London, with the aim of making a computationally efficient and interpretable reduced order modeling and forecasting tool accessible to researchers and practitioners in fluid dynamics, weather, and climate.
+`SVD-ROM` was developed as part of the Environmental Forecasting mission at the Alan Turing Institute, with the aim of making a computationally efficient and interpretable reduced order modeling and forecasting tool accessible to researchers and practitioners in fluid dynamics, weather, and climate.
 A major motivation was to enable the analysis of large datasets that are otherwise intractable on standard computing resources.
 `SVD-ROM` and related work has been presented at several conferences and workshops, including Climate Informatics 2026 in Lausanne [@Salvador:2026a], a PyData Meetup in London in February 2026 [@Salvador:2026b], and FOSDEM 2025 in Brussels [@Salvador:2025].
 The package is under active development and used by researchers at The Alan Turing Institute to explore use cases in climate and weather forecasting.
