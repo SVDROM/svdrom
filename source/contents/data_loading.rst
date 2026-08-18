@@ -34,3 +34,32 @@ See the `Xarray reading and writing files guide <https://docs.xarray.dev/en/stab
 
     Earlier versions of SVD-ROM provided ``svdrom.io.open_dataset`` and ``svdrom.io.open_dataarray``.
     These wrappers have been removed; use ``xr.open_dataset`` and ``xr.open_dataarray`` directly instead.
+
+Loading Multiple Files
+-----------------------
+
+To combine many files (e.g. one file per timestep) into a single lazy, Dask-backed dataset, use ``xr.open_mfdataset``:
+
+.. code-block:: python
+
+    import xarray as xr
+
+    ds = xr.open_mfdataset(
+        files,
+        combine="nested",
+        concat_dim="time",
+        parallel=True,
+        engine="h5netcdf",
+        data_vars="minimal",
+        coords="minimal",
+        compat="override",
+        chunks={"time": time_chunk},
+    )
+
+- ``combine="nested"`` with ``concat_dim="time"``: concatenates the files in the order given along the ``time`` dimension, rather than inferring the arrangement from coordinate values (as ``combine="by_coords"`` would).
+- ``parallel=True``: opens the files concurrently using Dask.
+- ``engine``: using ``"h5netcdf"`` backend.
+- ``data_vars="minimal"`` and ``coords="minimal"``: only concatenate variables/coordinates that already vary along ``concat_dim``, leaving the rest to be taken from the first file. This avoids unnecessarily broadcasting static fields across the new dimension.
+- ``compat="override"``: skips comparing non-concatenated variables/coordinates across files for equality, taking them from the first file. Combined with ``data_vars`` and ``coords`` set to ``"minimal"``, this keeps opening many files fast.
+- ``chunks``: sets the Dask chunk size along the newly created ``time`` dimension. Note that ``open_mfdataset`` applies ``chunks`` *per file, before concatenation* — if each file covers only one timestep, ``time`` chunks are always size 1 regardless of the value given here. To get coarser chunks along ``time``, rechunk afterwards with ``ds.chunk({"time": desired_chunk_size})``.
+
