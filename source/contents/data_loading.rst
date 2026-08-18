@@ -38,7 +38,7 @@ See the `Xarray reading and writing files guide <https://docs.xarray.dev/en/stab
 Loading Multiple Files
 -----------------------
 
-To combine many files (e.g. one file per timestep) into a single lazy, Dask-backed dataset, use ``xr.open_mfdataset``:
+To combine multiple netCDF files into a single lazy, Dask-backed dataset, use ``xr.open_mfdataset``:
 
 .. code-block:: python
 
