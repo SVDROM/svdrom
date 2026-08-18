@@ -165,5 +165,6 @@ All AI-assisted output was reviewed, tested, and approved by the authors, who ta
 ## Acknowledgements
 
 We acknowledge contributions from J. Nathan Kutz (Autodesk Research, UK) and Benet Eiximeno Franch (NVIDIA, Spain) for their advice on the design of a scalable DMD implementation, and from the `PyDMD` development team for their support in integrating Optimized DMD into `SVD-ROM`.
+Authors DSJ, OS, LvZ, LF, PY and SH were supported by The Alan Turing Institute.
 
 ## References
