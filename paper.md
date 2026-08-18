@@ -11,9 +11,10 @@ authors:
   - name: David I. Salvador-Jasin
     orcid: 0000-0001-8892-2410
     corresponding: true # (This is how to denote the corresponding author)
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
+    affiliation: 1 # (Multiple affiliations must be quoted)
+    address: Cognition, London, UK
   - name: Robert Vava
-    affiliation: 3
+    affiliation: 2
   - name: Oliver Strickson
     affiliation: 1
   - name: Louisa van Zeeland
@@ -25,12 +26,10 @@ authors:
   - name: Scott Hosking
     affiliation: 1
 affiliations:
- - name: The Alan Turing Institute, London, United Kingdom
-   index: 1
- - name: Cognition, London, United Kingdom
-   index: 2
- - name: Independent Researcher, London, United Kingdom
-   index: 3
+  - name: The Alan Turing Institute, London, United Kingdom
+    index: 1
+  - name: Independent Researcher, London, United Kingdom
+    index: 2
 date: 13 August 2026
 bibliography: paper.bib
 ---
