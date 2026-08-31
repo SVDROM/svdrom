@@ -238,6 +238,35 @@ class TruncatedSVD(DecompositionModel):
             attrs=attrs,
         )
 
+    def _compute_explained_var_ratio(
+        self,
+        X_da: da.Array,
+        u: da.Array,
+        s: da.Array,
+    ) -> da.Array:
+        """Build the lazy graph for the ratio of explained variance by each
+        component, following scikit-learn's `(n_samples, n_features)`
+        convention: the variance of each transformed component over the
+        samples, divided by the total variance of the features.
+
+        Subclasses that use a different orientation or a different notion of
+        explained variance can override this method. The returned collection
+        is evaluated together with the other SVD results in `fit`.
+
+        Parameters
+        ----------
+        X_da: da.Array, shape (n_samples, n_features)
+            The (possibly rechunked) array the SVD was computed on.
+        u: da.Array, shape (n_samples, n_components)
+            The truncated left singular vectors.
+        s: da.Array, shape (n_components,)
+            The truncated singular values.
+        """
+        X_da_transformed = u * s
+        explained_var = X_da_transformed.var(axis=0)
+        full_var = X_da.var(axis=0).sum()
+        return explained_var / full_var
+
     def fit(
         self,
         X: xr.DataArray,
@@ -279,10 +308,7 @@ class TruncatedSVD(DecompositionModel):
             X_da = self._rechunk_array(X_da) if self._rechunk else X_da
             u, s, v = da.linalg.svd_compressed(X_da, self._n_components, **kwargs)
 
-        X_da_transformed = u * s
-        explained_var = X_da_transformed.var(axis=0)
-        full_var = X_da.var(axis=0).sum()
-        explained_var_ratio = explained_var / full_var
+        explained_var_ratio = self._compute_explained_var_ratio(X_da, u, s)
 
         results = []
         results.append(s)

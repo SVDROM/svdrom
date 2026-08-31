@@ -245,6 +245,82 @@ def test_energy_calculation():
     assert np.allclose(pod.energy, ref_eigenvalues, rtol=1e-3)
 
 
+def test_explained_energy_ratio_matches_full_svd():
+    """Test that the energy ratios match `s_i**2 / sum_j s_j**2` obtained
+    from a full NumPy SVD of the same preprocessed matrix."""
+    X = make_dataarray("tall-and-skinny", time_dim_pos=1)
+    n_snapshots = X.sizes["time"]
+    n_modes = N_MODES
+
+    pod = POD(n_modes=n_modes, svd_algorithm="tsqr", compute_energy_ratio=True)
+    pod.fit(X)
+    ratio = np.asarray(pod.explained_energy_ratio)
+
+    F = (X - X.mean(dim="time")).values / np.sqrt(n_snapshots)
+    s = np.linalg.svd(F, compute_uv=False)
+    ref = s[:n_modes] ** 2 / (s**2).sum()
+
+    assert np.allclose(ratio, ref, rtol=1e-4)
+    # equivalently, the squared Frobenius norm of the preprocessed matrix
+    assert np.allclose(ratio, pod.energy / (F**2).sum(), rtol=1e-4)
+
+
+def test_explained_energy_ratio_dominant_uniform_mode():
+    """Test that a field dominated by a spatially uniform (bulk) oscillation
+    reports the uniform mode as the most energetic one."""
+    rng = np.random.default_rng(0)
+    n_space, n_time = 300, 60
+    t = np.arange(n_time)
+
+    uniform = np.ones((n_space, 1)) * np.sin(2 * np.pi * t / 12)[None, :] * 10.0
+    structured = (
+        np.sin(np.linspace(0, 4 * np.pi, n_space))[:, None]
+        * np.cos(2 * np.pi * t / 7)[None, :]
+    )
+    X = uniform + structured + 0.01 * rng.normal(size=(n_space, n_time))
+
+    Xd = xr.DataArray(
+        da.from_array(X, chunks=(n_space // 4, n_time)),
+        dims=["space", "time"],
+        coords={"space": np.arange(n_space), "time": t},
+    )
+    pod = POD(n_modes=4, svd_algorithm="tsqr", compute_energy_ratio=True)
+    pod.fit(Xd)
+    ratio = np.asarray(pod.explained_energy_ratio)
+
+    F = (X - X.mean(axis=1, keepdims=True)) / np.sqrt(n_time)
+    s = np.linalg.svd(F, compute_uv=False)
+    ref = s[:4] ** 2 / (s**2).sum()
+
+    assert np.allclose(ratio, ref, atol=1e-8)
+    # the dominant uniform mode carries the vast majority of the energy
+    assert ratio[0] > 0.99
+    assert np.all(np.diff(ratio) <= 0)
+
+
+@pytest.mark.parametrize("n_modes", [4, 20])
+def test_explained_energy_ratio_sums(n_modes):
+    """Test that the retained energy ratios sum to less than one, and
+    approach one as the number of modes approaches the rank."""
+    rng = np.random.default_rng(1)
+    n_space, n_time = 200, 21
+    X = rng.normal(size=(n_space, n_time)) @ np.diag(np.linspace(1.0, 0.05, n_time))
+
+    Xd = xr.DataArray(
+        da.from_array(X, chunks=(n_space // 4, n_time)),
+        dims=["space", "time"],
+        coords={"space": np.arange(n_space), "time": np.arange(n_time)},
+    )
+    pod = POD(n_modes=n_modes, svd_algorithm="tsqr", compute_energy_ratio=True)
+    pod.fit(Xd)
+    total = float(np.sum(np.asarray(pod.explained_energy_ratio)))
+
+    assert total < 1.0
+    # rank of the mean-removed matrix is n_time - 1 = 20
+    if n_modes == 20:
+        assert total > 0.999
+
+
 def test_invalid_time_dimension_error():
     """Test that a ValueError is raised for a non-existent time dimension."""
     X = make_dataarray("tall-and-skinny")
