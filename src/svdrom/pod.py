@@ -144,7 +144,7 @@ class POD(TruncatedSVD):
         reported fractions, which is not part of the POD energy definition
         and can even invert the ranking of the modes.
         """
-        total_energy = (X_da**2).sum()
+        total_energy = (da.absolute(X_da) ** 2).sum()
         return s**2 / total_energy
 
     def _preprocess_array(self, X: xr.DataArray) -> xr.DataArray:
