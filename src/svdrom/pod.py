@@ -72,7 +72,8 @@ class POD(TruncatedSVD):
     energy: np.ndarray or None
         Energy (variance) explained by each POD mode.
     explained_energy_ratio: np.ndarray or da.Array or None
-        Ratio of total energy explained by each POD mode.
+        Ratio of total energy explained by each POD mode, i.e.
+        `s_i**2 / ||F||_F**2` with `F` the preprocessed snapshot matrix.
     """
 
     def __init__(
@@ -120,8 +121,31 @@ class POD(TruncatedSVD):
 
     @property
     def explained_energy_ratio(self) -> np.ndarray | da.Array | None:
-        """Ratio of total energy (read-only)."""
+        """Ratio of total energy explained by each POD mode (read-only).
+
+        Defined as ``s_i**2 / ||F||_F**2``, where ``F`` is the preprocessed
+        snapshot matrix. The ratios of the retained modes sum to less than
+        one whenever fewer modes than the rank of ``F`` are computed.
+        """
         return self._explained_var_ratio
+
+    def _compute_explained_var_ratio(
+        self,
+        X_da: da.Array,
+        _u: da.Array,
+        s: da.Array,
+    ) -> da.Array:
+        """Build the lazy graph for the modal energy fractions,
+        ``s_i**2 / ||F||_F**2``.
+
+        This replaces the scikit-learn style variance ratio of
+        `TruncatedSVD`, which subtracts a mean along the first axis. For POD
+        that axis is space, so the spatial mean would be removed from the
+        reported fractions, which is not part of the POD energy definition
+        and can even invert the ranking of the modes.
+        """
+        total_energy = (da.absolute(X_da) ** 2).sum()
+        return s**2 / total_energy
 
     def _preprocess_array(self, X: xr.DataArray) -> xr.DataArray:
         """Transpose the array if the user-specified time dimension
