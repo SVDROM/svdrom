@@ -28,6 +28,56 @@
         "infra",
         "doc"
       ]
+    },
+    {
+      "login": "louisavz",
+      "name": "louisavz",
+      "avatar_url": "https://avatars.githubusercontent.com/u/63079440?v=4",
+      "profile": "https://github.com/louisavz",
+      "contributions": [
+        "research",
+        "ideas"
+      ]
+    },
+    {
+      "login": "LydiaFrance",
+      "name": "Lydia France",
+      "avatar_url": "https://avatars.githubusercontent.com/u/85945427?v=4",
+      "profile": "https://github.com/LydiaFrance",
+      "contributions": [
+        "research",
+        "ideas"
+      ]
+    },
+    {
+      "login": "ots22",
+      "name": "ots22",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5434836?v=4",
+      "profile": "https://github.com/ots22",
+      "contributions": [
+        "research",
+        "ideas"
+      ]
+    },
+    {
+      "login": "pyatsysh",
+      "name": "Peter Yatsyshin",
+      "avatar_url": "https://avatars.githubusercontent.com/u/20075514?v=4",
+      "profile": "https://www.yatsyshin.com/",
+      "contributions": [
+        "research",
+        "ideas"
+      ]
+    },
+    {
+      "login": "bef-18",
+      "name": "bef-18",
+      "avatar_url": "https://avatars.githubusercontent.com/u/61317743?v=4",
+      "profile": "https://github.com/bef-18",
+      "contributions": [
+        "ideas",
+        "research"
+      ]
     }
   ]
 }
