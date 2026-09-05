@@ -7,8 +7,8 @@ import pytest
 import xarray as xr
 
 import svdrom.config as config
+from svdrom import TruncatedSVD
 from svdrom.preprocessing import hankel_preprocessing
-from svdrom.svd import TruncatedSVD
 
 samples_coord_name = "samples"
 time_coord_name = "time"

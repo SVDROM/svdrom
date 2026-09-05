@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from svdrom.pod import POD
+from svdrom import POD
 
 N_MODES = 10
 
