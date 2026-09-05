@@ -342,3 +342,144 @@ def test_compute_acc(data_generator):
         "Expected mean ACC to be close to 1 for perfect predictions, "
         f"but got {acc.values.mean()}."
     )
+
+
+@pytest.mark.parametrize("func", [compute_rmse, compute_mae])
+def test_rmse_mae_lat_weighting(func, data_generator):
+    """compute_rmse()/compute_mae() apply latitude weighting when requested."""
+    prediction, groundtruth = data_generator()
+    score = func(groundtruth, prediction, lat_weighting=True)
+
+    lat_weights = np.cos(np.deg2rad(groundtruth.latitude))
+    diff = (groundtruth - prediction.real) ** 2
+    if func is compute_mae:
+        diff = np.abs(groundtruth - prediction.real)
+    expected = diff.weighted(lat_weights).mean(dim=("latitude", "longitude"))
+    if func is compute_rmse:
+        expected = expected.clip(min=0) ** 0.5
+
+    xr.testing.assert_allclose(score, expected)
+    assert set(score.dims) == {"level", "time"}
+
+
+@pytest.mark.parametrize("func", [compute_rmse, compute_mae])
+def test_rmse_mae_lat_weighting_missing_latitude(func, data_generator):
+    """compute_rmse()/compute_mae() raise when latitude is missing but
+    latitude weighting is requested."""
+    prediction, groundtruth = data_generator()
+    prediction = prediction.rename({"latitude": "lat"})
+    groundtruth = groundtruth.rename({"latitude": "lat"})
+
+    with pytest.raises(ValueError, match="latitude"):
+        func(groundtruth, prediction, lat_weighting=True, dims=("lat", "longitude"))
+
+
+@pytest.mark.parametrize("func", [compute_rmse, compute_mae])
+def test_rmse_mae_misaligned_grid(func, data_generator):
+    """compute_rmse()/compute_mae() raise when inputs are on different grids."""
+    prediction, groundtruth = data_generator()
+    prediction = prediction.isel(latitude=slice(0, -1))
+
+    with pytest.raises(ValueError, match="cannot be aligned"):
+        func(groundtruth, prediction)
+
+
+def test_compute_climatology_missing_time(data_generator):
+    """compute_climatology() raises when the input lacks a time dimension."""
+    _, groundtruth = data_generator()
+    no_time = groundtruth.isel(time=0)
+
+    with pytest.raises(ValueError, match="time"):
+        compute_climatology(no_time)
+
+
+def test_expand_time_climatology_missing_dims(data_generator):
+    """expand_time_climatology() raises when dayofyear/hour dims are missing."""
+    _, groundtruth = data_generator()
+
+    with pytest.raises(ValueError, match="dayofyear"):
+        expand_time_climatology(groundtruth, year=2020)
+
+
+def test_compute_energy_spectrum_requires_numpy(data_generator):
+    """compute_energy_spectrum() raises when the input is not numpy-backed."""
+    pytest.importorskip(
+        "weatherbench2.derived_variables",
+        reason="compute_energy_spectrum() requires the weather dependencies.",
+    )
+    prediction, _ = data_generator()
+    prediction = prediction.chunk({"time": 1})
+
+    with pytest.raises(ValueError, match="Numpy array"):
+        compute_energy_spectrum(prediction)
+
+
+def test_compute_crps_requires_numpy(
+    data_generator, probabilistic_prediction_generator
+):
+    """compute_crps_gaussian() raises when any input is not numpy-backed."""
+    pytest.importorskip(
+        "properscoring",
+        reason="compute_crps_gaussian() requires the weather dependencies.",
+    )
+    _, groundtruth = data_generator()
+    prediction_mean, prediction_std = probabilistic_prediction_generator
+
+    with pytest.raises(ValueError, match="numpy-backed"):
+        compute_crps_gaussian(
+            groundtruth.chunk({"time": 1}), prediction_mean, prediction_std
+        )
+
+
+def test_compute_crps_non_positive_std(
+    data_generator, probabilistic_prediction_generator
+):
+    """compute_crps_gaussian() raises when the std array is not strictly positive."""
+    pytest.importorskip(
+        "properscoring",
+        reason="compute_crps_gaussian() requires the weather dependencies.",
+    )
+    _, groundtruth = data_generator()
+    prediction_mean, prediction_std = probabilistic_prediction_generator
+    prediction_std = xr.zeros_like(prediction_std)
+
+    with pytest.raises(ValueError, match="positive values"):
+        compute_crps_gaussian(groundtruth, prediction_mean, prediction_std)
+
+
+def test_compute_crps_misaligned_grid(
+    data_generator, probabilistic_prediction_generator
+):
+    """compute_crps_gaussian() raises when inputs are on different grids."""
+    pytest.importorskip(
+        "properscoring",
+        reason="compute_crps_gaussian() requires the weather dependencies.",
+    )
+    _, groundtruth = data_generator()
+    prediction_mean, prediction_std = probabilistic_prediction_generator
+    groundtruth = groundtruth.isel(latitude=slice(0, -1))
+
+    with pytest.raises(ValueError, match="cannot be aligned"):
+        compute_crps_gaussian(groundtruth, prediction_mean, prediction_std)
+
+
+def test_compute_acc_misaligned_grid(data_generator):
+    """compute_acc() raises when inputs are on different grids."""
+    prediction, groundtruth = data_generator()
+    climatology = xr.zeros_like(groundtruth)
+    prediction = prediction.isel(latitude=slice(0, -1))
+
+    with pytest.raises(ValueError, match="cannot be aligned"):
+        compute_acc(groundtruth, prediction, climatology)
+
+
+def test_compute_acc_missing_lat_lon(data_generator):
+    """compute_acc() raises when latitude/longitude dims are absent."""
+    prediction, groundtruth = data_generator()
+    rename = {"latitude": "lat", "longitude": "lon"}
+    prediction = prediction.rename(rename)
+    groundtruth = groundtruth.rename(rename)
+    climatology = xr.zeros_like(groundtruth)
+
+    with pytest.raises(ValueError, match="not present"):
+        compute_acc(groundtruth, prediction, climatology)
