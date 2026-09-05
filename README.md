@@ -37,10 +37,10 @@ cd svdrom
 python -m pip install .
 ```
 
-It is strongly recommended to install SVD-ROM using [uv](https://docs.astral.sh/uv/):
+It is strongly recommended to install SVD-ROM using [uv](https://docs.astral.sh/uv/).
+Create a virtual environment with any supported Python version (3.10, 3.11, or 3.12), then install the package:
 ```bash
-uv venv
-source .venv/bin/activate
+uv venv --python 3.12
 uv pip install .
 ```
 
