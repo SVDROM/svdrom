@@ -27,3 +27,10 @@ exclude_patterns = []
 
 html_theme = "alabaster"
 html_static_path = ["_static"]
+html_logo = "media/svdrom-logo.png"
+html_favicon = "media/svdrom-favicon.png"
+
+html_theme_options = {
+    "logo_name": False,  # the wordmark is already part of the logo image
+    "description": "Scalable SVD-based Reduced Order Modeling",
+}
