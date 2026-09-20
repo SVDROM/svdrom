@@ -1,0 +1,11 @@
+Vendored from PyDMD (https://github.com/PyDMD/PyDMD)
+via fork https://github.com/SVDROM/PyDMD at commit
+3e3f7f91125b02688328eb312f7576630c530d15.
+MIT License (see LICENSE).
+
+Files vendored:
+bopdmd.py, dmdbase.py, dmdoperator.py, snapshots.py, utils.py,
+preprocessing/hankel.py, preprocessing/pre_post_processing.py.
+
+Modifications are limited to relative import rewrites in preprocessing/
+and a raw-string docstring fix in dmdoperator.py.

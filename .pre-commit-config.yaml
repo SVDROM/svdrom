@@ -42,7 +42,6 @@ repos:
           - xarray
           - dask
           - zarr<=3.1.0
-          - pydmd
           - pandas
           - pandas-stubs
           - weatherbench2 @ git+https://github.com/google-research/weatherbench2.git
