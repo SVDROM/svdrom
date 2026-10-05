@@ -159,6 +159,10 @@ src/*/_version.py
 ehthumbs.db
 Thumbs.db
 
+# JOSS paper build artifacts (openjournals/inara)
+#   paper.pdf is deliberately tracked so co-authors can review it on GitHub.
+jats/
+
 # Common editor files
 *~
 *.swp
