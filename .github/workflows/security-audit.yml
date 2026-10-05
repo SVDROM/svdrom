@@ -1,0 +1,29 @@
+name: Security audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "uv.lock"
+      - "pyproject.toml"
+      - ".github/workflows/security-audit.yml"
+  schedule:
+    - cron: "0 7 * * 1"  # Mondays at 07:00 UTC
+
+jobs:
+  uv-audit:
+    name: Audit uv.lock for known vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Audit locked dependencies
+        # apache-beam (weather extra, via weatherbench2) caps cryptography <49;
+        # drop these ignores once it allows cryptography>=50.
+        run: >-
+          uv audit --locked --preview-features audit-command
+          --ignore PYSEC-2026-3554 --ignore GHSA-m2h6-j472-rp4c
+          --ignore PYSEC-2026-3553 --ignore GHSA-jwv3-5hgf-82ww
+          --ignore PYSEC-2026-3552 --ignore GHSA-g6cj-pr64-35w5
