@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.10, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12' and platform_machine == 'ARM64' and sys_platform == 'win32'",
@@ -1260,16 +1260,16 @@ wheels = [
 
 [[package]]
 name = "fsspec"
-version = "2026.6.0"
+version = "2026.9.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/10/a1/ae4e3e5003468d6391d2c77b6fa1cd73bd5d13511d81c642d7b28ac90ed4/fsspec-2026.6.0.tar.gz", hash = "sha256:f5bac145310fe30e16e1471bd6840b2d990d609e872251d7e674241822abf01a", size = 313646, upload-time = "2026-06-16T01:57:28.105Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/77/cd/9be253869fc42e764de7f3dedd6969af7d44ff9c3375214a3442a6f3fc08/fsspec-2026.9.0.tar.gz", hash = "sha256:0f08147951c8cb31d844c3547d631053b127863b60be04cf06e121333ee0e2fe", size = 333545, upload-time = "2026-09-18T17:50:42.825Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/22/4222d7ddf3da30f363edaa98e329c2bce6c65497c9cb2810931c8b2c0fbc/fsspec-2026.6.0-py3-none-any.whl", hash = "sha256:02e0b71817df9b2169dc30a16832045764def1191b43dcff5bb85bdee212d2a1", size = 203949, upload-time = "2026-06-16T01:57:26.358Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl", hash = "sha256:8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f", size = 221738, upload-time = "2026-09-18T17:50:41.341Z" },
 ]
 
 [[package]]
 name = "gcsfs"
-version = "2026.7.0"
+version = "2026.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1281,9 +1281,9 @@ dependencies = [
     { name = "google-cloud-storage-control" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/33/58e23c6f492e091c2f01ae1bffe331aa97e18a0b3d24ff90ef648335ddc8/gcsfs-2026.7.0.tar.gz", hash = "sha256:2df36ce1e9010e76dc4295774030495a97496838483c619e9f63bc0ab7bdc770", size = 1265874, upload-time = "2026-07-06T15:02:30.683Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/59/a1074622f998fd67c35a08509aedf75e18ec11889f5256aa89c631138587/gcsfs-2026.10.0.tar.gz", hash = "sha256:caa7e34d7618905a70bc7b3d7cf84d745cfa25d9817fd4d7f6211c3ce1350a19", size = 1117748, upload-time = "2026-10-01T14:08:07.148Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/eb/a5c4b39903928e6be7735cc7aa31b6c3bbf3d887419e1e7ac751dba02233/gcsfs-2026.7.0-py3-none-any.whl", hash = "sha256:8ce6c08ea64302d8fd4bc23a615ccd9e7752541cde1a88ec8362109bd79cde78", size = 91131, upload-time = "2026-07-06T15:02:29.208Z" },
+    { url = "https://files.pythonhosted.org/packages/85/5b/a74dc26273a07af686f815ae2069c03e83d4717aae1a4149d1f13f0907d7/gcsfs-2026.10.0-py3-none-any.whl", hash = "sha256:5211ef51fab3cb30bc9fa4628c0bc5a26f9908c1bdfb6864778454a682373a7b", size = 88109, upload-time = "2026-10-01T14:08:05.512Z" },
 ]
 
 [[package]]
@@ -1349,7 +1349,7 @@ wheels = [
 
 [[package]]
 name = "google-cloud-storage"
-version = "3.13.0"
+version = "3.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "google-api-core" },
@@ -1359,9 +1359,9 @@ dependencies = [
     { name = "google-resumable-media" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/25/355ed97c1723c787dfaa888808d55db18371f82c38ff862357b1e902cd19/google_cloud_storage-3.13.0.tar.gz", hash = "sha256:d11d8706ea1520fba0f21043bcb7897caf7015d76ce1ad9a4f60237e4d7a9f6c", size = 17340960, upload-time = "2026-07-13T19:10:07.524Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/54/d487cd2bcf2c94befce79baa677c54fa863f88c221e5481a4066ab08c33e/google_cloud_storage-3.16.0.tar.gz", hash = "sha256:3f75cf8ad345d68ef33f0c69db8a8b3f34f160b1524e75d73890602b7b8a4d6e", size = 17351062, upload-time = "2026-10-01T18:18:20.765Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/e8/b3678a0931ee7d4b3fdaf0813e6206d66e0922b2c26d912f308728b5b95a/google_cloud_storage-3.13.0-py3-none-any.whl", hash = "sha256:648af3ef8a6acc674e1359d3c920c67eb89a7a5ab66b336bd3ac43fed6b5ab84", size = 341428, upload-time = "2026-07-13T19:09:52.39Z" },
+    { url = "https://files.pythonhosted.org/packages/47/bf/1a0f5f7fc1d4af8b95fc1da72d3cfe84ac709ef4dcabfd2182ef9cfe3a7a/google_cloud_storage-3.16.0-py3-none-any.whl", hash = "sha256:59e54ff1f7f8a7253c01f593f79d253728c122a8901b83f68fe7464a4131539f", size = 343457, upload-time = "2026-10-01T18:12:33.141Z" },
 ]
 
 [[package]]
@@ -2948,10 +2948,6 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/76/7bc801796dee752c1ce9cd6935564a6ee79d5c9d9ef9192f57b156495a35/netcdf4-1.7.3.tar.gz", hash = "sha256:83f122fc3415e92b1d4904fd6a0898468b5404c09432c34beb6b16c533884673", size = 836095, upload-time = "2025-10-13T18:38:00.76Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/06/57/c233d8dcf6efe0add48bb1d8d6fe32d7ad547d5c0d84bf0cbe7e5d82147b/netcdf4-1.7.3-cp310-cp310-win_amd64.whl", hash = "sha256:6ab71f5d70e55e8584d168d5158efdb2fd8d350a033d0c27d942c3d399587f54", size = 7214638, upload-time = "2025-10-13T18:37:51.627Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/f8/a5509bc46faedae2b71df29c57e6525b7eb47aee44000fd43e2927a9a3a9/netcdf4-1.7.3-cp311-abi3-win_amd64.whl", hash = "sha256:1b6c646fa179fb1e5e8d6e8231bc78cc0311eceaa1241256b5a853f1d04055b9", size = 7149328, upload-time = "2025-10-13T18:37:59.242Z" },
-]
 
 [[package]]
 name = "netcdf4"
@@ -3478,7 +3474,7 @@ wheels = [
 
 [[package]]
 name = "pre-commit"
-version = "4.6.1"
+version = "4.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cfgv" },
@@ -3487,9 +3483,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "virtualenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/3a/ddb78f32a0814e66b18a099377a106a2dcdce92d86a034d69d65df9b256e/pre_commit-4.6.1.tar.gz", hash = "sha256:03e809865c7d178b9979d06c761fcbfe6808fdaded8581a745bb110e52050421", size = 198646, upload-time = "2026-07-21T20:56:58.225Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/89/1f3e8e1fc3e97de0fa963495832f581f025f29471602a309e48808244292/pre_commit-4.6.2.tar.gz", hash = "sha256:8f5d7bfb021ecdbcd9d49d89847082dd24172ccde534390081a679ad046e2441", size = 198670, upload-time = "2026-08-10T22:07:18.421Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/49/bc925106abcdac498074f2cbe6137e94e09f418dd2b7775df5b577dc0313/pre_commit-4.6.1-py2.py3-none-any.whl", hash = "sha256:0e3b2942510d1fb34eec167a3ec57331bf8442122f1153a9fb8b58f5c49b2717", size = 226186, upload-time = "2026-07-21T20:56:57.064Z" },
+    { url = "https://files.pythonhosted.org/packages/45/e2/bbb7129c9e7999a6b8ee9cca3b66486c25c423ab5a75f34071798b74ce94/pre_commit-4.6.2-py2.py3-none-any.whl", hash = "sha256:e2dde9a75d3bce11bd3831c26d134df00a2803c1d818be6a0383c3dcda25dc4e", size = 226202, upload-time = "2026-08-10T22:07:16.942Z" },
 ]
 
 [[package]]
@@ -3757,7 +3753,7 @@ wheels = [
 
 [[package]]
 name = "pydmd"
-version = "2025.8.1.post45+git.3e3f7f91"
+version = "2025.8.1.post45+git.3e3f7f91.dirty"
 source = { git = "https://github.com/PyDMD/PyDMD.git#3e3f7f91125b02688328eb312f7576630c530d15" }
 dependencies = [
     { name = "dask", extra = ["diagnostics", "distributed"] },
