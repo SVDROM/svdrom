@@ -57,6 +57,10 @@ docs = [
   "sphinx",
   "myst-parser",
 ]
+neuro = [
+    "mne>=1.9,<1.14",
+    "psutil>=5.9",
+]
 
 [project.urls]
 Homepage = "https://github.com/SVDROM/svdrom"
