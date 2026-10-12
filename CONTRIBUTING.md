@@ -113,7 +113,7 @@ Notes:
 Dependencies are kept current and free of known vulnerabilities by three pieces that work together.
 
 1. **Dependabot** (`.github/dependabot.yml`) opens PRs every Monday at 05:00 UTC that bump outdated `uv` dependencies and GitHub Actions, whether or not they are vulnerable. Minor and patch bumps are grouped into one PR. Major `cryptography` bumps are ignored: `apache-beam` (pulled in by the `weather` extra via `weatherbench2`) caps it, and resolving a major bump downgrades `apache-beam` and `pyarrow` and brings back known vulnerabilities.
-2. **Security audit** (`.github/workflows/security-audit.yml`) runs `uv audit` against `uv.lock` every Monday at 07:00 UTC, on manual dispatch, and on PRs that change `uv.lock`, `pyproject.toml` or the workflow itself. Advisories that can't be fixed yet because of an upstream cap are skipped with commented `--ignore` flags. Remove them once the cap is lifted.
+2. **Security audit** (`.github/workflows/security-audit.yml`) runs `uv audit` against `uv.lock` every Monday at 07:23 UTC (off the hour, since GitHub may drop scheduled runs at the start of busy hours), on manual dispatch, and on PRs that change `uv.lock`, `pyproject.toml` or the workflow itself. Advisories that can't be fixed yet because of an upstream cap are skipped with commented `--ignore` flags. Remove them once the cap is lifted.
 3. **Devin Automation** ("Remediate failed uv audit on SVDROM/svdrom main") starts a [Devin](https://devin.ai) session when the audit job fails on `main`. Failures on PR branches don't trigger it. The session:
    - skips advisories already covered by an open PR, including Dependabot's;
    - bumps the affected packages in `uv.lock` only, without raising floors in `pyproject.toml`;
