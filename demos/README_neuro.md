@@ -83,9 +83,10 @@ RSS is measured on Linux/macOS; other platforms can run the notebook but the
 benchmark's memory measurement currently requires one of those systems.
 Workers use two Dask threads and one BLAS thread by default, with no GPU.
 
-The checked-in report records package versions, platform, environment-visible RAM,
+The locally generated report records package versions, platform, environment-visible RAM,
 file sizes, sample counts, channel order, and calibration/reference metadata.
-It contains a reference run, not measurements from whoever opens the notebook.
+Reports are not tracked in Git. Run the benchmark to measure your own environment;
+the notebook's saved outputs show a previous reference run.
 The file manifest is not a cryptographic integrity check. Each worker's peak
 includes all worker stages and rank-eight held-out evaluation, but excludes the
 parent process, notebook plots, Welch analysis, participant validation, other
@@ -176,12 +177,10 @@ and telemetry are not compression targets. No stimulus decoding is performed.
 
 The source directory must contain `sub-01/session_01/block_01/` through
 `sub-20/session_04/block_19/`. Set `SVDROM_EEG_LARGE_DIR` to the **raw_eeg**
-directory, not the dataset parent. EEGVIX already has this complete scheduled
-corpus under `challenge/runtime/data/Xu2025Alljoined/download/raw_eeg`; the demo
-can read it in place. It does not modify that project's inputs or caches.
-For another machine, use the authors' download instructions and acquire only
-the EEG files needed here; stimuli and preprocessed image-response tensors
-are unnecessary.
+directory, not the dataset parent. The demo can read an existing download in
+place without modifying its inputs. Use the authors' download instructions and
+acquire only the EEG files needed here; stimuli and preprocessed image-response
+tensors are unnecessary.
 
 The audit validates each EDF header, calibration endpoints, selected electrode
 names, native sample rate and payload length. Participant 8's known subject-19
@@ -263,8 +262,11 @@ Open `pod_demo_eeg_large.ipynb` from `demos/` after the benchmark. Set
 `SVDROM_EEG_LARGE_ENCODED` if using custom cache, report, or encoded-directory
 paths. In particular, set `SVDROM_EEG_LARGE_ENCODED` to the directory passed
 with `--encoded-dir` when repeating the benchmark into a new directory.
-The notebook reports the checked-in reference measurements separately from its
-current fit, and plots input versus memory, elapsed time, actual storage versus
+The complete benchmark generates `demos/eeg_large_benchmark.json` locally; this
+report is required before executing the large notebook and is not tracked in
+Git. The notebook's saved outputs show a previous reference run. On execution,
+it reports your benchmark measurements separately from the current kernel fit,
+and plots input versus memory, elapsed time, actual storage versus
 reconstruction error, participant validation, spectral errors, saved-factor
 waveforms and channel quality. Whole-worker RSS includes the worker's imports
 and stages, excluding the notebook, other processes and filesystem cache.
@@ -290,5 +292,3 @@ equal-participant energy retention averages 92.1%/96.8%, ranging
 and rank-to-channel fraction than the 64-channel demo; they do not isolate
 the effect of adding data. The channel audit flags a recording in participant
 13 where Fp1 contributes 89.3% of conditioned variance; it remains included.
-
-
