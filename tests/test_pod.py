@@ -10,6 +10,83 @@ from svdrom import POD
 N_MODES = 10
 
 
+def test_covariance_pod_matches_direct_svd() -> None:
+    """The covariance backend recovers the exact leading real-data POD modes."""
+    rng = np.random.default_rng(7)
+    values = rng.normal(size=(6, 40)) + np.arange(6)[:, None]
+    data = xr.DataArray(
+        da.from_array(values, chunks=(6, 7)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABCDEF"), "time": np.arange(40)},
+    )
+    model = POD(
+        n_modes=4,
+        svd_algorithm="covariance",
+        compute_time_coeffs=False,
+        compute_energy_ratio=True,
+    ).fit(data)
+
+    centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(40)
+    expected_modes, expected_s, _ = np.linalg.svd(centered, full_matrices=False)
+    np.testing.assert_allclose(model.s, expected_s[:4], rtol=1e-10)
+    np.testing.assert_allclose(
+        model.explained_energy_ratio,
+        expected_s[:4] ** 2 / np.sum(expected_s**2),
+        rtol=1e-10,
+    )
+    np.testing.assert_allclose(
+        np.abs(model.modes.data.T @ expected_modes[:, :4]),
+        np.eye(4),
+        atol=1e-10,
+    )
+    assert isinstance(model.time_coeffs.data, da.Array)
+    assert isinstance(model.v.data, da.Array)
+    np.testing.assert_allclose(
+        model.transform(data).data,
+        model.time_coeffs.compute().data,
+        atol=1e-10,
+    )
+
+
+def test_covariance_pod_rejects_zero_energy_and_extra_arguments() -> None:
+    """The covariance fit reports undefined energy and unsupported SVD options."""
+    data = xr.DataArray(
+        da.zeros((3, 12), chunks=(3, 4)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABC"), "time": np.arange(12)},
+    )
+    with pytest.raises(ValueError, match="zero total energy"):
+        POD(n_modes=2, svd_algorithm="covariance").fit(data)
+    with pytest.raises(TypeError, match="does not accept SVD keyword arguments"):
+        POD(n_modes=2, svd_algorithm="covariance").fit(data, seed=0)
+
+
+def test_covariance_pod_lazy_modes_and_training_reconstruction() -> None:
+    """The covariance backend honors compute flags and reconstructs snapshots."""
+    rng = np.random.default_rng(19)
+    values = rng.normal(size=(5, 24))
+    data = xr.DataArray(
+        da.from_array(values, chunks=(5, 6)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABCDE"), "time": np.arange(24)},
+    )
+    model = POD(
+        n_modes=3,
+        svd_algorithm="covariance",
+        compute_modes=False,
+        compute_time_coeffs=True,
+        compute_energy_ratio=False,
+    ).fit(data)
+
+    assert isinstance(model.modes.data, da.Array)
+    assert isinstance(model.time_coeffs.data, np.ndarray)
+    assert isinstance(model.explained_energy_ratio, da.Array)
+    expected = values.mean(axis=1) + model.modes.compute().data @ (
+        model.modes.compute().data.T @ (values[:, 0] - values.mean(axis=1))
+    )
+    np.testing.assert_allclose(model.reconstruct(0).data, expected)
+
+
 def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
     """Make a Dask-backed DataArray with random data of
     specified matrix type.
@@ -758,3 +835,26 @@ def test_extended_pod_different_matrix_types(matrix_type):
     assert isinstance(
         chi.data, np.ndarray
     ), f"Expected numpy-backed DataArray, got {type(chi.data)}."
+
+
+@pytest.mark.parametrize("chunks", [(6, 7), (2, 11), (6, 40)])
+def test_covariance_pod_rank_deficiency_and_chunking(chunks: tuple[int, int]) -> None:
+    """A rank-two signal is recovered across channel and sample chunk layouts."""
+    rng = np.random.default_rng(43)
+    values = (rng.normal(size=(6, 2)) @ rng.normal(size=(2, 40))).astype(np.float32)
+    data = xr.DataArray(da.from_array(values, chunks=chunks), dims=("channel", "time"))
+    model = POD(n_modes=4, svd_algorithm="covariance", compute_time_coeffs=False).fit(
+        data
+    )
+    centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(40)
+    expected_s = np.linalg.svd(centered, compute_uv=False)
+    np.testing.assert_allclose(model.s[:2], expected_s[:2], rtol=2e-6)
+    coefficients = model.time_coeffs.compute().data
+    assert np.isfinite(coefficients).all()
+    recovered = model.modes.data @ coefficients * np.sqrt(40) + values.mean(
+        axis=1, keepdims=True
+    )
+    np.testing.assert_allclose(recovered, values, atol=2e-6)
+    np.testing.assert_allclose(
+        model.modes.data.T @ model.modes.data, np.eye(4), atol=1e-12
+    )
