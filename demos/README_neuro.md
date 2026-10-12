@@ -291,5 +291,4 @@ and rank-to-channel fraction than the 64-channel demo; they do not isolate
 the effect of adding data. The channel audit flags a recording in participant
 13 where Fp1 contributes 89.3% of conditioned variance; it remains included.
 
-The [final technical and figure review](REVIEW_neuro.md) records the evidence,
-corrections and remaining limits of the publication claims.
+
