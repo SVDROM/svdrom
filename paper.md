@@ -71,6 +71,8 @@ While `SVD-ROM` is a data-centric/scalable ROM library, `pyMOR` is a model-centr
 Finally, `EZyRB` [@Demo:2018] is a general-purpose Python ROM framework focused on POD/reduced-basis methods and parametric model reduction, including interpolation of reduced-order solutions.
 While `EZyRB` provides a broader ROM toolbox than `SVD-ROM`, it is not specifically optimized for large-scale data processing.
 
+In summary, `SVD-ROM` fills a gap between these tools. Like PyLOM and PySPOD, it targets datasets larger than memory, but it runs on a single workstation without MPI or specialized hardware, and it brings Optimized DMD from `PyDMD` to that scale.
+
 ## Methods
 
 Spatio-temporal data is arranged into an $(m \times n)$ snapshot matrix $\mathbf{X}$ whose rows index spatial locations and whose columns index time.
