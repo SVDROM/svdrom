@@ -105,8 +105,8 @@ In addition, it allows uncertainty quantification through bagging [@Sashidhar:20
 
 `SVD-ROM` is built on top of `Xarray` [@Hoyer:2017] and `Dask` [@Rocklin:2015], and operates throughout on chunked, Dask-backed `Xarray` `DataArray` objects.
 This choice underpins both of the package's design goals.
-Firstly, labelled dimensions and coordinates mean that users work with named physical axes (for example, 'time', 'latitude' and 'longitude') rather than raw matrix indices, and are preserved across decomposition, reconstruction and forecasting.
-Secondly, the `Dask` backend provides the lazy, out-of-core and parallel execution that allows datasets larger than memory to be processed on a single machine, streaming from and to on-disk `Zarr` stores or `NetCDF` files.
+Firstly, labelled dimensions and coordinates allow users to work with named physical axes (for example, 'time', 'latitude' and 'longitude') rather than raw matrix indices, and labels are preserved across decomposition, reconstruction and forecasting.
+Secondly, the `Dask` backend provides the lazy, out-of-core and parallel execution that allows datasets larger than memory to be processed on a single machine across multiple CPU cores, streaming from and to on-disk `Zarr` stores or `NetCDF` files.
 
 All models share a common interface through an abstract `DecompositionModel` base class exposing the `fit` and `reconstruct` methods.
 The computational core is the `TruncatedSVD` class, which offers a choice between a deterministic, communication-efficient QR factorization for tall-and-skinny matrices [@Benson:2013], and a randomized algorithm [@Halko:2011], trading accuracy for speed and relaxed chunking requirements on very large arrays.
@@ -115,7 +115,7 @@ The computational core is the `TruncatedSVD` class, which offers a choice betwee
 The singular value decomposition is computed once and reused, meaning that a single decomposition can feed several downstream Optimized DMD models at no additional cost.
 
 Throughout, users retain explicit control over what is materialized in memory: `compute_*` flags and companion methods make it possible to build a `Dask` computational graph and defer its evaluation, so that expensive quantities such as spatial modes or time coefficients are only computed when needed.
-The package is written in pure Python with no compilation or MPI configuration required, is fully type annotated, and ships optional extras for weather and climate workflows (`weather_utils`).
+The package is written in pure Python with no compilation required, is fully type annotated, and ships optional extras for weather and climate workflows (`weather_utils`).
 An `SPOD` class is currently a placeholder, reflecting the intended extension of the same interface to further SVD-based methods in future releases.
 
 ## Example
