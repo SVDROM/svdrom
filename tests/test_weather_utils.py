@@ -406,7 +406,7 @@ def test_expand_time_climatology_preserves_dask(data_generator):
     """expand_time_climatology() preserves dask-backed input laziness."""
     _, groundtruth = data_generator()
     clim_np = compute_climatology(groundtruth)
-    clim_dask = clim_np.chunk({"dayofyear": 30})
+    clim_dask = compute_climatology(groundtruth.chunk({"time": -1}))
 
     out_dask = expand_time_climatology(clim_dask, year=2020)
     out_np = expand_time_climatology(clim_np, year=2020)
