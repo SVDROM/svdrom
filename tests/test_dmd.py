@@ -412,8 +412,8 @@ class BaseTestOptDMD:
             if is_bagging:
                 real_itemsize = dtype.type(0).real.dtype.itemsize
                 memory_factor = 3 + 2 * real_itemsize / dtype.itemsize
-                expected_factor = 4 if np.issubdtype(dtype, np.complexfloating) else 5
-                assert memory_factor == expected_factor
+                assert np.issubdtype(dtype, np.complexfloating)
+                assert memory_factor == 4
             expected_size = int(np.ceil(array_size * memory_factor))
             assert solver._estimate_array_size(t) == expected_size
 
