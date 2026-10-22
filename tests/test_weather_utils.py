@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import dask.array
 import numpy as np
 import pandas as pd
 import pytest
@@ -414,10 +415,11 @@ def test_compute_energy_spectrum_requires_numpy(data_generator):
         compute_energy_spectrum(prediction)
 
 
-def test_compute_crps_requires_numpy(
-    data_generator, probabilistic_prediction_generator
+@pytest.mark.parametrize("dims", [("latitude", "longitude"), None])
+def test_compute_crps_gaussian_dask(
+    data_generator, probabilistic_prediction_generator, dims
 ):
-    """compute_crps_gaussian() raises when any input is not numpy-backed."""
+    """compute_crps_gaussian() computes lazily for dask-backed inputs."""
     pytest.importorskip(
         "properscoring",
         reason="compute_crps_gaussian() requires the weather dependencies.",
@@ -425,10 +427,21 @@ def test_compute_crps_requires_numpy(
     _, groundtruth = data_generator()
     prediction_mean, prediction_std = probabilistic_prediction_generator
 
-    with pytest.raises(ValueError, match="numpy-backed"):
-        compute_crps_gaussian(
-            groundtruth.chunk({"time": 1}), prediction_mean, prediction_std
-        )
+    numpy_result = compute_crps_gaussian(
+        groundtruth, prediction_mean, prediction_std, dims=dims
+    )
+    for inputs in (
+        (
+            groundtruth.chunk({"time": 100}),
+            prediction_mean.chunk({"time": 100}),
+            prediction_std.chunk({"time": 100}),
+        ),
+        (groundtruth.chunk({"time": 100}), prediction_mean, prediction_std),
+    ):
+        result = compute_crps_gaussian(*inputs, dims=dims)
+
+        assert isinstance(result.data, dask.array.Array)
+        xr.testing.assert_allclose(result.compute(), numpy_result)
 
 
 def test_compute_crps_non_positive_std(
@@ -445,6 +458,12 @@ def test_compute_crps_non_positive_std(
 
     with pytest.raises(ValueError, match="positive values"):
         compute_crps_gaussian(groundtruth, prediction_mean, prediction_std)
+    with pytest.raises(ValueError, match="positive values"):
+        compute_crps_gaussian(
+            groundtruth,
+            prediction_mean,
+            prediction_std.chunk({"time": 100}),
+        )
 
 
 def test_compute_crps_misaligned_grid(
