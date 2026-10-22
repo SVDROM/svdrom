@@ -134,22 +134,23 @@ The weather utilities module provides metrics and tools commonly used in weather
     .. note::
         This function requires the optional ``weather`` dependencies. Install them with: ``pip install "svdrom[weather]"``.
 
-    :param ground_truth: The ground truth data. Must be a NumPy-backed array.
+    :param ground_truth: The ground truth data. Can be Dask-backed or NumPy-backed.
     :type ground_truth: xarray.DataArray
-    :param prediction_mean: The mean of the predictions ensemble. Must be a NumPy-backed array.
+    :param prediction_mean: The mean of the predictions ensemble. Can be Dask-backed or NumPy-backed.
     :type prediction_mean: xarray.DataArray
-    :param prediction_std: The standard deviation of the predictions ensemble. Must be a NumPy-backed array with only positive values.
+    :param prediction_std: The standard deviation of the predictions ensemble with only positive values. Can be Dask-backed or NumPy-backed.
     :type prediction_std: xarray.DataArray
     :param lat_weighting: Whether to apply latitude-based weighting. Default is ``True``.
     :type lat_weighting: bool
     :param dims: Dimensions along which to average the CRPS. Default is ``("latitude", "longitude")``. Set to ``None`` to skip averaging.
     :type dims: str or tuple[str, ...] or None
-    :returns: The CRPS as a NumPy-backed DataArray.
+    :returns: The CRPS as a DataArray, Dask-backed if any input is Dask-backed, otherwise NumPy-backed.
     :rtype: xarray.DataArray
 
     .. rubric:: Notes
 
-    All input arrays must be NumPy-backed. CRPS is calculated using ``crps_gaussian()`` from the `properscoring <https://github.com/properscoring/properscoring>`_ library.
+    CRPS is calculated using ``crps_gaussian()`` from the `properscoring <https://github.com/properscoring/properscoring>`_ library.
+    For Dask-backed inputs, the positivity check on ``prediction_std`` computes a scalar reduction.
 
 .. py:function:: compute_acc(ground_truth, prediction, climatology)
 
