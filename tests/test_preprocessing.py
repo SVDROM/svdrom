@@ -198,7 +198,7 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
     )
 
 
-def test_hankel_preprocessing_numpy_memory_limit():
+def test_hankel_preprocessing_numpy_memory_limit() -> None:
     """Test that large NumPy inputs use a lazy Dask-backed result."""
     X = xr.DataArray(
         np.arange(10).reshape(2, 5),
@@ -218,7 +218,7 @@ def test_hankel_preprocessing_numpy_memory_limit():
     )
 
 
-def test_hankel_preprocessing_numpy_default_memory_limit():
+def test_hankel_preprocessing_numpy_default_memory_limit() -> None:
     """Test that NumPy inputs stay NumPy-backed under the default limit."""
     X = xr.DataArray(
         np.arange(10).reshape(2, 5),
@@ -231,7 +231,7 @@ def test_hankel_preprocessing_numpy_default_memory_limit():
     assert isinstance(result.data, np.ndarray)
 
 
-def test_hankel_preprocessing_multiindex_samples():
+def test_hankel_preprocessing_multiindex_samples() -> None:
     """Test that stacked MultiIndex sample coordinates preserve their levels."""
     X = (
         xr.DataArray(
