@@ -146,7 +146,9 @@ class StandardScaler:
         return X - self._mean
 
 
-def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
+def hankel_preprocessing(
+    X: xr.DataArray, d: int = 2, memory_limit_bytes: float = 1e9
+) -> xr.DataArray:
     """Hankel pre-processing.
 
     Given a matrix with dimensions (m x n), where 'm' is the number of
@@ -163,20 +165,29 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         be NumPy or Dask-backed.
     d: int
         Hankel matrix rank. Must be an integer equal to or greater than 2.
+    memory_limit_bytes: float
+        The memory threshold for computing the Hankel matrix with NumPy or
+        Dask. If the estimated output size, ``X.nbytes * d``, is less than
+        or equal to this limit, a NumPy-backed input returns a NumPy-backed
+        result. Otherwise, the input is wrapped with ``da.from_array`` and
+        the result is a lazy, Dask-backed DataArray. The default is 1e9
+        (1 GB).
 
     Returns
     -------
     xr.DataArray
         The augmented data matrix, with dimensions ((m*d) x (n-d+1)). For
         example, if d=2, the input array is augmented with one time-delay,
-        resulting in a matrix with dimensions ((2*m) x (n-1)). If the input
-        DataArray is NumPy-backed, the returned DataArray is also NumPy-backed.
-        If it is Dask-backed, then the returned DataArray is also Dask-backed.
-        The returned DataArray has a new coordinate which indicates the time
-        delay relative to the current time stamp. It also contains a new attribute
-        (a dictionary) that maps each original snapshot to a tuple consisting of
-        the first time-delay embedded snapshot in which it appears and the
-        corresponding lag index.
+        resulting in a matrix with dimensions ((2*m) x (n-1)). A NumPy-backed
+        input returns a NumPy-backed result only if the estimated output size
+        ``X.nbytes * d`` is less than or equal to ``memory_limit_bytes``.
+        Otherwise, the input is wrapped with ``da.from_array`` and the result
+        is a lazy, Dask-backed DataArray. A Dask-backed input also returns a
+        Dask-backed DataArray. The returned DataArray has a new coordinate which
+        indicates the time delay relative to the current time stamp. It also
+        contains a new attribute (a dictionary) that maps each original
+        snapshot to a tuple consisting of the first time-delay embedded
+        snapshot in which it appears and the corresponding lag index.
     """
     if X.ndim != 2:
         msg = "The input array must be two dimensional."
@@ -187,30 +198,45 @@ def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
         logger.exception(msg)
         raise ValueError(msg)
     n_rows = X.shape[0]
-    if isinstance(X.data, da.Array):
-        X_delayed = (
-            sliding_window_view_dask(X.data, d, axis=1)
-            .transpose(2, 0, 1)
-            .reshape(n_rows * d, -1)
-        )
-    elif isinstance(X.data, np.ndarray):
-        X_delayed = (
-            sliding_window_view_np(X.data, d, axis=1)
-            .transpose(2, 0, 1)
-            .reshape(n_rows * d, -1)
-        )
+    data: np.ndarray | da.Array
+    if isinstance(X.data, np.ndarray):
+        data = X.data
+        estimated_size = X.data.nbytes * d
+        if estimated_size > memory_limit_bytes:
+            logger.info("Will use Dask to compute the Hankel matrix.")
+            data = da.from_array(data)
+    elif isinstance(X.data, da.Array):
+        data = X.data
     else:
         msg = "The DataArray must be backed by a NumPy or Dask Array."
         logger.exception(msg)
         raise ValueError(msg)
 
-    dims = X.dims
-    samples: np.ndarray | pd.MultiIndex = np.tile(X[dims[0]].to_numpy(), d)
-    if isinstance(X.indexes[dims[0]], pd.MultiIndex):
-        samples = pd.MultiIndex.from_tuples(
-            samples,
-            names=X.indexes[dims[0]].names,
+    if isinstance(data, da.Array):
+        X_delayed = (
+            sliding_window_view_dask(data, d, axis=1)
+            .transpose(2, 0, 1)
+            .reshape(n_rows * d, -1)
         )
+    else:
+        X_delayed = (
+            sliding_window_view_np(data, d, axis=1)
+            .transpose(2, 0, 1)
+            .reshape(n_rows * d, -1)
+        )
+
+    dims = X.dims
+    sample_index = X.indexes[dims[0]]
+    if isinstance(sample_index, pd.MultiIndex):
+        samples: np.ndarray | pd.MultiIndex = pd.MultiIndex.from_arrays(
+            [
+                np.tile(sample_index.get_level_values(i), d)
+                for i in range(sample_index.nlevels)
+            ],
+            names=sample_index.names,
+        )
+    else:
+        samples = np.tile(X[dims[0]].to_numpy(), d)
 
     # map each original snapshot to the first Hankel matrix
     # snapshot in which it appears, and to the corresponding

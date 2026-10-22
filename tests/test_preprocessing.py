@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dask.array as da
 import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 from make_test_data import DataGenerator, SignalGenerator
@@ -194,3 +196,66 @@ def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int
         "After Hankel pre-processing, expected "
         f"X[{(d - 1) * n_samples}:, 0] to equal X[:{n_samples}, {d - 1}]."
     )
+
+
+def test_hankel_preprocessing_numpy_memory_limit():
+    """Test that large NumPy inputs use a lazy Dask-backed result."""
+    X = xr.DataArray(
+        np.arange(10).reshape(2, 5),
+        dims=("space", "time"),
+        coords={"space": ["a", "b"], "time": np.arange(5)},
+    )
+
+    expected = hankel_preprocessing(X)
+    actual = hankel_preprocessing(X, memory_limit_bytes=1)
+
+    assert isinstance(actual.data, da.Array)
+    xr.testing.assert_equal(actual.compute(), expected)
+    hankel_coord = config.get("hankel_coord_name")
+    xr.testing.assert_equal(
+        actual[hankel_coord],
+        expected[hankel_coord],
+    )
+
+
+def test_hankel_preprocessing_numpy_default_memory_limit():
+    """Test that NumPy inputs stay NumPy-backed under the default limit."""
+    X = xr.DataArray(
+        np.arange(10).reshape(2, 5),
+        dims=("space", "time"),
+        coords={"space": ["a", "b"], "time": np.arange(5)},
+    )
+
+    result = hankel_preprocessing(X)
+
+    assert isinstance(result.data, np.ndarray)
+
+
+def test_hankel_preprocessing_multiindex_samples():
+    """Test that stacked MultiIndex sample coordinates preserve their levels."""
+    X = (
+        xr.DataArray(
+            np.arange(36).reshape(2, 3, 6),
+            dims=("x", "y", "time"),
+            coords={
+                "x": ["west", "east"],
+                "y": [10, 20, 30],
+                "time": np.arange(6),
+            },
+        )
+        .stack(space=("x", "y"))
+        .transpose("space", "time")
+    )
+
+    result = hankel_preprocessing(X, d=3)
+    original_index = X.indexes["space"]
+    result_index = result.indexes["space"]
+
+    assert isinstance(result_index, pd.MultiIndex)
+    assert result_index.names == original_index.names
+    for level in range(original_index.nlevels):
+        expected_level = np.tile(original_index.get_level_values(level), 3)
+        np.testing.assert_array_equal(
+            result_index.get_level_values(level),
+            expected_level,
+        )
