@@ -391,6 +391,61 @@ class BaseTestOptDMD:
                 err_msg="Expected the forecast variance to match the output of PyDMD.",
             )
 
+    def test_estimate_array_size_accounts_for_bagging(self):
+        """Test the estimate includes the peak memory of NumPy bagging."""
+        t, _ = self.optdmd._generate_forecast_time_vector(
+            forecast_span="20 s",
+            dt="2 s",
+        )
+        for solver, memory_factor in (
+            (self.optdmd, 1),
+            (self.optdmd_bagging, 4),
+        ):
+            dtype = np.result_type(
+                solver._modes,
+                solver._amplitudes,
+                np.exp(np.outer(solver._eigs, t)),
+            )
+            expected_size = solver._modes.shape[0] * len(t) * np.dtype(dtype).itemsize
+            assert solver._estimate_array_size(t) == memory_factor * expected_size
+
+    def test_predict_bagging_streaming_matches_numpy_reference(self):
+        """Test streaming bagging statistics against stacked realizations."""
+        solver = self.optdmd_bagging
+        t, _ = solver._generate_forecast_time_vector(
+            forecast_span="20 s",
+            dt="2 s",
+        )
+        rng = np.random.default_rng(solver._seed)
+        predictions = []
+        for _ in range(solver._num_trials):
+            eigs = solver._eigs + np.multiply(
+                rng.standard_normal(*solver._eigs.shape),
+                solver._eigs_std,
+            )
+            amplitudes = solver._amplitudes + np.multiply(
+                rng.standard_normal(*solver._amplitudes.shape),
+                solver._amplitudes_std,
+            )
+            predictions.append(
+                np.linalg.multi_dot(
+                    [
+                        solver._modes,
+                        np.diag(amplitudes),
+                        np.exp(np.outer(eigs, t)),
+                    ]
+                )
+            )
+        stacked_predictions = np.stack(predictions, axis=0)
+        expected_mean = stacked_predictions.mean(axis=0)
+        expected_variance = stacked_predictions.var(axis=0)
+
+        actual_mean, actual_variance = solver._predict(t, use_dask=False)
+
+        np.testing.assert_allclose(actual_mean, expected_mean)
+        np.testing.assert_allclose(actual_variance, expected_variance)
+        assert actual_variance.dtype == expected_variance.dtype
+
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_forecast(self, solver):
         """Test for the forecast() method."""
