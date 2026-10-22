@@ -88,6 +88,29 @@ class BaseTestOptDMD:
             eig_sort="imag",
         )
 
+    def test_rechunk_along_columns(self) -> None:
+        """Test rechunking uses a positive number of time columns."""
+        solver = self.optdmd
+        solver.fit(
+            self.u,
+            self.s,
+            self.v,
+            varpro_opts_dict={"maxiter": 15},
+            eig_sort="imag",
+        )
+        arr = da.ones((5, 20), chunks=(5, 20))
+
+        with dask.config.set({"array.chunk-size": "1B"}):
+            rechunked = solver._rechunk_along_columns(arr)
+            assert rechunked.shape == arr.shape
+            assert rechunked.chunks[1] == (1,) * 20
+            assert rechunked.chunks[0] == (5,)
+            np.testing.assert_array_equal(rechunked.compute(), arr.compute())
+
+        rechunked = solver._rechunk_along_columns(arr)
+        assert rechunked.shape == arr.shape
+        assert all(chunk >= 1 for chunk in rechunked.chunks[1])
+
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_fit_outputs(self, solver):
         """Test data types and shapes of attributes after
