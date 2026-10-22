@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import dask.array
 import numpy as np
 import pandas as pd
 import pytest
@@ -399,6 +400,20 @@ def test_expand_time_climatology_missing_dims(data_generator):
 
     with pytest.raises(ValueError, match="dayofyear"):
         expand_time_climatology(groundtruth, year=2020)
+
+
+def test_expand_time_climatology_preserves_dask(data_generator):
+    """expand_time_climatology() preserves dask-backed input laziness."""
+    _, groundtruth = data_generator()
+    clim_np = compute_climatology(groundtruth)
+    clim_dask = clim_np.chunk({"dayofyear": 30})
+
+    out_dask = expand_time_climatology(clim_dask, year=2020)
+    out_np = expand_time_climatology(clim_np, year=2020)
+
+    assert isinstance(out_dask.data, dask.array.Array)
+    assert isinstance(out_np.data, np.ndarray)
+    xr.testing.assert_allclose(out_dask.compute(), out_np)
 
 
 def test_compute_energy_spectrum_requires_numpy(data_generator):
