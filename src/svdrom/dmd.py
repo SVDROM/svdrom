@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import warnings
 from typing import Literal, cast
 
@@ -15,9 +16,6 @@ from svdrom.logger import setup_logger
 from svdrom.svdrom_base import DecompositionModel
 
 logger = setup_logger("DMD", "dmd.log")
-
-# Peak arrays used while computing bagged statistics.
-_BAGGING_MEMORY_FACTOR = 4
 
 
 class OptDMD(DecompositionModel):
@@ -816,6 +814,8 @@ class OptDMD(DecompositionModel):
             # to produce the mean and variance of the prediction realizations
             mean: np.ndarray | None = None
             m2: np.ndarray | None = None
+            buf: np.ndarray | None = None
+            rbuf: np.ndarray | None = None
             for k in range(1, self._num_trials + 1):
                 eigs, amps = draw_from_rand_distr(rng)
                 prediction = np.linalg.multi_dot(
@@ -823,12 +823,22 @@ class OptDMD(DecompositionModel):
                 )
                 if mean is None:
                     mean = prediction
-                    m2 = np.zeros(prediction.shape, dtype=prediction.real.dtype)
-                    continue
-                delta = prediction - mean
-                mean += delta / k
-                prediction -= mean
-                m2 += (np.conj(delta) * prediction).real
+                    real_dtype = prediction.real.dtype
+                    m2 = np.zeros(prediction.shape, dtype=real_dtype)
+                    buf = np.empty_like(prediction)
+                    rbuf = np.empty(prediction.shape, dtype=real_dtype)
+                else:
+                    assert m2 is not None
+                    assert buf is not None
+                    assert rbuf is not None
+                    prediction -= mean
+                    np.multiply(prediction, 1.0 / k, out=buf)
+                    mean += buf
+                    np.abs(prediction, out=rbuf)
+                    np.square(rbuf, out=rbuf)
+                    rbuf *= (k - 1) / k
+                    m2 += rbuf
+                del prediction
 
             assert mean is not None
             assert m2 is not None
@@ -980,9 +990,13 @@ class OptDMD(DecompositionModel):
             self._amplitudes,
             np.exp(np.outer(self._eigs, t)),
         )
-        array_size = (np.prod(array_shape) * np.dtype(dtype).itemsize).item()
+        dtype = np.dtype(dtype)
+        array_size = int(np.prod(array_shape) * dtype.itemsize)
         if self._eigs_std is not None and self._amplitudes_std is not None:
-            return array_size * _BAGGING_MEMORY_FACTOR
+            real_itemsize = dtype.type(0).real.dtype.itemsize
+            factor = 3 + 2 * real_itemsize / dtype.itemsize
+            # Counts mean, update buffer, prediction, M2, and real update buffer.
+            return math.ceil(array_size * factor)
         return array_size
 
     def _apply_hankel_postprocessing(

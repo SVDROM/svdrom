@@ -391,25 +391,33 @@ class BaseTestOptDMD:
                 err_msg="Expected the forecast variance to match the output of PyDMD.",
             )
 
-    def test_estimate_array_size_accounts_for_bagging(self):
+    def test_estimate_array_size_accounts_for_bagging(self) -> None:
         """Test the estimate includes the peak memory of NumPy bagging."""
         t, _ = self.optdmd._generate_forecast_time_vector(
             forecast_span="20 s",
             dt="2 s",
         )
-        for solver, memory_factor in (
-            (self.optdmd, 1),
-            (self.optdmd_bagging, 4),
+        for solver, is_bagging in (
+            (self.optdmd, False),
+            (self.optdmd_bagging, True),
         ):
             dtype = np.result_type(
                 solver._modes,
                 solver._amplitudes,
                 np.exp(np.outer(solver._eigs, t)),
             )
-            expected_size = solver._modes.shape[0] * len(t) * np.dtype(dtype).itemsize
-            assert solver._estimate_array_size(t) == memory_factor * expected_size
+            dtype = np.dtype(dtype)
+            array_size = solver._modes.shape[0] * len(t) * dtype.itemsize
+            memory_factor = 1
+            if is_bagging:
+                real_itemsize = dtype.type(0).real.dtype.itemsize
+                memory_factor = 3 + 2 * real_itemsize / dtype.itemsize
+                expected_factor = 4 if np.issubdtype(dtype, np.complexfloating) else 5
+                assert memory_factor == expected_factor
+            expected_size = int(np.ceil(array_size * memory_factor))
+            assert solver._estimate_array_size(t) == expected_size
 
-    def test_predict_bagging_streaming_matches_numpy_reference(self):
+    def test_predict_bagging_streaming_matches_numpy_reference(self) -> None:
         """Test streaming bagging statistics against stacked realizations."""
         solver = self.optdmd_bagging
         t, _ = solver._generate_forecast_time_vector(
