@@ -88,7 +88,7 @@ class BaseTestOptDMD:
             eig_sort="imag",
         )
 
-    def test_rechunk_along_columns(self) -> None:
+    def test_rechunk_along_columns(self):
         """Test rechunking uses a positive number of time columns."""
         solver = self.optdmd
         solver.fit(
