@@ -450,10 +450,19 @@ class BaseTestOptDMD:
             if is_bagging:
                 real_itemsize = dtype.type(0).real.dtype.itemsize
                 memory_factor = 3 + 2 * real_itemsize / dtype.itemsize
-                assert np.issubdtype(dtype, np.complexfloating)
-                assert memory_factor == 4
+                assert np.issubdtype(
+                    dtype, np.complexfloating
+                ), f"Expected bagging predictions to be complex, but got {dtype}."
+                assert memory_factor == 4, (
+                    f"Expected a complex bagging memory factor of 4, "
+                    f"but got {memory_factor}."
+                )
             expected_size = int(np.ceil(array_size * memory_factor))
-            assert solver._estimate_array_size(t) == expected_size
+            estimated_size = solver._estimate_array_size(t)
+            assert estimated_size == expected_size, (
+                f"Expected estimated size {expected_size} bytes, "
+                f"but got {estimated_size} bytes."
+            )
 
     def test_predict_bagging_streaming_matches_numpy_reference(self) -> None:
         """Test streaming bagging statistics against stacked realizations."""
@@ -488,9 +497,20 @@ class BaseTestOptDMD:
 
         actual_mean, actual_variance = solver._predict(t, use_dask=False)
 
-        np.testing.assert_allclose(actual_mean, expected_mean)
-        np.testing.assert_allclose(actual_variance, expected_variance)
-        assert actual_variance.dtype == expected_variance.dtype
+        np.testing.assert_allclose(
+            actual_mean,
+            expected_mean,
+            err_msg="Expected streaming mean to match the stacked reference.",
+        )
+        np.testing.assert_allclose(
+            actual_variance,
+            expected_variance,
+            err_msg="Expected streaming variance to match the stacked reference.",
+        )
+        assert actual_variance.dtype == expected_variance.dtype, (
+            f"Expected variance dtype {expected_variance.dtype}, "
+            f"but got {actual_variance.dtype}."
+        )
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_forecast(self, solver):
