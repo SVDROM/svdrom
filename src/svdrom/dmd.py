@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import warnings
 from typing import Literal, cast
 
@@ -775,7 +776,6 @@ class OptDMD(DecompositionModel):
             return eigs, amps
 
         rng = np.random.default_rng(self._seed)
-        predictions = []
 
         if use_dask:
             # use Dask to compute the prediction
@@ -783,6 +783,7 @@ class OptDMD(DecompositionModel):
             if self._eigs_std is not None and self._amplitudes_std is not None:
                 # when bagging has been used, use Monte-Carlo uncertainty propagation
                 # to produce multiple prediction realizations
+                predictions = []
                 for _ in range(self._num_trials):
                     # draw eigenvalues and amplitudes from random distribution
                     eigs, amps = draw_from_rand_distr(rng)
@@ -810,16 +811,38 @@ class OptDMD(DecompositionModel):
         # use NumPy to compute the prediction
         if self._eigs_std is not None and self._amplitudes_std is not None:
             # if bagging has been used, use Monte-Carlo uncertainty propagation
-            # to produce multiple prediction realizations
-            for _ in range(self._num_trials):
+            # to produce the mean and variance of the prediction realizations
+            mean: np.ndarray | None = None
+            m2: np.ndarray | None = None
+            buf: np.ndarray | None = None
+            rbuf: np.ndarray | None = None
+            for k in range(1, self._num_trials + 1):
                 eigs, amps = draw_from_rand_distr(rng)
-                forecast = np.linalg.multi_dot(
+                prediction = np.linalg.multi_dot(
                     [self._modes, np.diag(amps), np.exp(np.outer(eigs, t))]
                 )
-                predictions.append(forecast)
+                if mean is None:
+                    mean = prediction
+                    real_dtype = prediction.real.dtype
+                    m2 = np.zeros(prediction.shape, dtype=real_dtype)
+                    buf = np.empty_like(prediction)
+                    rbuf = np.empty(prediction.shape, dtype=real_dtype)
+                else:
+                    assert m2 is not None
+                    assert buf is not None
+                    assert rbuf is not None
+                    prediction -= mean
+                    np.multiply(prediction, 1.0 / k, out=buf)
+                    mean += buf
+                    np.abs(prediction, out=rbuf)
+                    np.square(rbuf, out=rbuf)
+                    rbuf *= (k - 1) / k
+                    m2 += rbuf
+                del prediction
 
-            predictions_np = np.stack(predictions, axis=0)
-            return predictions_np.mean(axis=0), predictions_np.var(axis=0)
+            assert mean is not None
+            assert m2 is not None
+            return mean, m2 / self._num_trials
 
         return np.linalg.multi_dot(
             [
@@ -953,8 +976,10 @@ class OptDMD(DecompositionModel):
         return t - self._hankel_d + 1, self._hankel_d - 1
 
     def _estimate_array_size(self, t: np.ndarray) -> int:
-        """Given an input time vector, estimate the size of the array
-        resulting from the corresponding DMD reconstruction or forecast."""
+        """Estimate peak eager memory for a DMD reconstruction or forecast.
+
+        The estimate includes the additional peak memory required for bagging.
+        """
         if self._modes is None or self._eigs is None or self._amplitudes is None:
             msg = "Results of the OptDMD fit are not available."
             logger.exception(msg)
@@ -965,7 +990,14 @@ class OptDMD(DecompositionModel):
             self._amplitudes,
             np.exp(np.outer(self._eigs, t)),
         )
-        return (np.prod(array_shape) * np.dtype(dtype).itemsize).item()
+        dtype = np.dtype(dtype)
+        array_size = int(np.prod(array_shape) * dtype.itemsize)
+        if self._eigs_std is not None and self._amplitudes_std is not None:
+            real_itemsize = dtype.type(0).real.dtype.itemsize
+            factor = 3 + 2 * real_itemsize / dtype.itemsize
+            # Counts mean, update buffer, prediction, M2, and real update buffer.
+            return math.ceil(array_size * factor)
+        return array_size
 
     def _apply_hankel_postprocessing(
         self,
@@ -1034,11 +1066,13 @@ class OptDMD(DecompositionModel):
             was fitted. The default is None.
         memory_limit_bytes: float, optional
             The memory threshold that decides whether to compute the forecast
-            using NumPy or Dask. If the estimated array size is below
-            memory_limit_bytes, NumPy is used and the forecast is returned as
-            a NumPy-backed Xarray. If the estimated array size is above
-            memory_limit_bytes, Dask is used and the forecast is returned as
-            a Dask-backed Xarray. The default value is 1e9 (1 GB).
+            using NumPy or Dask. The estimate accounts for the peak memory of
+            the NumPy computation, including additional arrays used for bagging.
+            If the estimated array size is below memory_limit_bytes, NumPy is
+            used and the forecast is returned as a NumPy-backed Xarray. If the
+            estimated array size is above memory_limit_bytes, Dask is used and
+            the forecast is returned as a Dask-backed Xarray. The default value
+            is 1e9 (1 GB).
 
         Returns
         -------
@@ -1260,11 +1294,13 @@ class OptDMD(DecompositionModel):
             None.
         memory_limit_bytes: float, optional
             The memory threshold that decides whether to compute the reconstruction
-            using NumPy or Dask. If the estimated array size is below
-            memory_limit_bytes, NumPy is used and the reconstruction is returned as
-            a NumPy-backed Xarray. If the estimated array size is above
-            memory_limit_bytes, Dask is used and the reconstruction is returned as
-            a Dask-backed Xarray. The default value is 1e9 (1 GB).
+            using NumPy or Dask. The estimate accounts for the peak memory of
+            the NumPy computation, including additional arrays used for bagging.
+            If the estimated array size is below memory_limit_bytes, NumPy is
+            used and the reconstruction is returned as a NumPy-backed Xarray.
+            If the estimated array size is above memory_limit_bytes, Dask is
+            used and the reconstruction is returned as a Dask-backed Xarray.
+            The default value is 1e9 (1 GB).
 
         Returns
         -------
