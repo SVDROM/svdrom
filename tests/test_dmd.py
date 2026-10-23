@@ -102,14 +102,29 @@ class BaseTestOptDMD:
 
         with dask.config.set({"array.chunk-size": "1B"}):
             rechunked = solver._rechunk_along_columns(arr)
-            assert rechunked.shape == arr.shape
-            assert rechunked.chunks[1] == (1,) * 20
-            assert rechunked.chunks[0] == (5,)
-            np.testing.assert_array_equal(rechunked.compute(), arr.compute())
+            assert (
+                rechunked.shape == arr.shape
+            ), "Expected rechunking to preserve the array shape."
+            assert rechunked.chunks[1] == (1,) * 20, (
+                "Expected a time chunk size of 1 when one snapshot exceeds the "
+                "Dask chunk-size limit."
+            )
+            assert rechunked.chunks[0] == (
+                5,
+            ), "Expected the rows to remain in a single chunk."
+            np.testing.assert_array_equal(
+                rechunked.compute(),
+                arr.compute(),
+                err_msg="Expected rechunking to preserve the array values.",
+            )
 
         rechunked = solver._rechunk_along_columns(arr)
-        assert rechunked.shape == arr.shape
-        assert all(chunk >= 1 for chunk in rechunked.chunks[1])
+        assert (
+            rechunked.shape == arr.shape
+        ), "Expected rechunking to preserve the array shape."
+        assert all(
+            chunk >= 1 for chunk in rechunked.chunks[1]
+        ), "Expected all time chunks to contain at least one column."
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_fit_outputs(self, solver):
