@@ -53,6 +53,10 @@ uv run pytest
 Without the optional `weather` extras, tests that require those dependencies are
 skipped.
 
+Give every assertion a descriptive message so failures are self-explanatory,
+e.g. `assert x.shape == y.shape, "Expected the shapes to match."`. For
+`np.testing` helpers, pass `err_msg="Expected ..."`.
+
 # Coverage
 
 Use pytest-cov to generate coverage reports:
