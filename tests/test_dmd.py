@@ -429,7 +429,7 @@ class BaseTestOptDMD:
                 err_msg="Expected the forecast variance to match the output of PyDMD.",
             )
 
-    def test_estimate_array_size_accounts_for_bagging(self) -> None:
+    def test_estimate_array_size_accounts_for_bagging(self):
         """Test the estimate includes the peak memory of NumPy bagging."""
         t, _ = self.optdmd._generate_forecast_time_vector(
             forecast_span="20 s",
@@ -464,7 +464,7 @@ class BaseTestOptDMD:
                 f"but got {estimated_size} bytes."
             )
 
-    def test_predict_bagging_streaming_matches_numpy_reference(self) -> None:
+    def test_predict_bagging_streaming_matches_numpy_reference(self):
         """Test streaming bagging statistics against stacked realizations."""
         solver = self.optdmd_bagging
         t, _ = solver._generate_forecast_time_vector(
