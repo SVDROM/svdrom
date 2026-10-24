@@ -134,6 +134,7 @@ from svdrom.preprocessing import StandardScaler, variable_spatial_stack
 # Open the store lazily, remove the time mean, and stack latitude and longitude
 # into the "samples" dimension of a tall-and-skinny snapshot matrix.
 X = xr.open_dataarray("era5_slice.zarr", chunks="auto")
+X = X.sel(time=slice("2016-01-01", "2019-12-31"))  # optionally, select a time slice
 scaler = StandardScaler()
 X = variable_spatial_stack(scaler(X), dims=("latitude", "longitude")).T
 
