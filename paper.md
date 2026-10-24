@@ -117,7 +117,7 @@ The computational core is the `TruncatedSVD` class, which offers a choice betwee
 The singular value decomposition is computed once and reused, meaning that a single decomposition can feed several downstream Optimized DMD models at no additional cost.
 
 Throughout, users retain explicit control over what is materialized in memory: `compute_*` flags and companion methods make it possible to build a `Dask` computational graph and defer its evaluation, so that expensive quantities such as spatial modes or time coefficients are only computed when needed.
-The package is written in pure Python with no compilation required, is fully type annotated, and ships optional extras for weather and climate workflows (`weather_utils`).
+The package is written in pure Python with no compilation required, includes type annotations, and ships optional extras for weather and climate workflows (`weather_utils`).
 An `SPOD` class is currently a placeholder, reflecting the intended extension of the same interface to further SVD-based methods in future releases.
 
 ## Example
