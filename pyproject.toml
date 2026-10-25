@@ -31,7 +31,8 @@ dependencies = [
   "zarr<=3.1.0",
   "dask[complete]",
   "xarray[complete]",
-  "pydmd @ git+https://github.com/PyDMD/PyDMD.git",
+  "scipy",
+  "matplotlib",
 ]
 
 [project.optional-dependencies]
@@ -70,7 +71,7 @@ addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
 filterwarnings = [
   "error",
-  "ignore::UserWarning:pydmd",
+  "ignore::UserWarning:svdrom._vendor.pydmd",
   "ignore::PendingDeprecationWarning:weatherbench2",
 ]
 log_cli_level = "INFO"
@@ -96,8 +97,9 @@ disallow_incomplete_defs = false
 check_untyped_defs = true
 strict = false
 [[tool.mypy.overrides]]
-module = ["pydmd.*", "weatherbench2.*"]
+module = ["svdrom._vendor.pydmd.*", "weatherbench2.*"]
 ignore_missing_imports = true
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = ["zarr.*"]
@@ -105,8 +107,11 @@ follow_imports = "skip"
 
 [tool.ruff]
 src = ["src"]
-exclude = []
+exclude = ["src/svdrom/_vendor"]
 line-length = 88  # how long you want lines to be
+
+[tool.setuptools.package-data]
+"svdrom._vendor.pydmd" = ["LICENSE", "NOTICE"]
 
 [tool.ruff.format]
 docstring-code-format = true  # code snippets in docstrings will be formatted
