@@ -161,7 +161,7 @@ The `demos/` directory contains extended versions of this workflow, including re
 `SVD-ROM` was developed as part of the Environmental Forecasting mission at the Alan Turing Institute, with the aim of making a computationally efficient and interpretable reduced order modeling and forecasting tool accessible to researchers and practitioners in fluid dynamics, weather, and climate.
 The package is under active development and we are currently exploring uses cases in other scientific fields, including neuroscience.
 A major motivation was to enable the analysis of large datasets that are otherwise intractable on standard computing resources.
-`SVD-ROM` and related work has been presented at several conferences and workshops, including Climate Informatics 2026 in Lausanne [@Salvador:2026a], a PyData Meetup in London in February 2026 [@Salvador:2026b], and FOSDEM 2025 in Brussels [@Salvador:2025]. 
+`SVD-ROM` and related work has been presented at several conferences and workshops, including Climate Informatics 2026 in Lausanne [@Salvador:2026a], a PyData Meetup in London in February 2026 [@Salvador:2026b], and FOSDEM 2025 in Brussels [@Salvador:2025].
 
 ## AI usage disclosure
 
