@@ -27,11 +27,11 @@ authors:
   - name: Scott Hosking
     affiliation: 1
 affiliations:
-  - name: The Alan Turing Institute, London, United Kingdom
+  - name: The Alan Turing Institute, London, UK
     index: 1
   - name: Cognition, San Francisco, USA
     index: 2
-  - name: Independent Researcher, London, United Kingdom
+  - name: Independent Researcher, London, UK
     index: 3
 date: 13 August 2026
 bibliography: paper.bib
