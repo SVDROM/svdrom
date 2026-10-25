@@ -165,3 +165,6 @@ Thumbs.db
 
 # VS Code
 .vscode/
+
+# Data folders 
+demos/data/
