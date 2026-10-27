@@ -62,4 +62,3 @@ To combine multiple netCDF files into a single lazy, Dask-backed dataset, use ``
 - ``data_vars="minimal"`` and ``coords="minimal"``: only concatenate variables/coordinates that already vary along ``concat_dim``, leaving the rest to be taken from the first file. This avoids unnecessarily broadcasting static fields across the new dimension.
 - ``compat="override"``: skips comparing non-concatenated variables/coordinates across files for equality, taking them from the first file. Combined with ``data_vars`` and ``coords`` set to ``"minimal"``, this keeps opening many files fast.
 - ``chunks``: sets the Dask chunk size along the newly created ``time`` dimension. Note that ``open_mfdataset`` applies ``chunks`` *per file, before concatenation* — if each file covers only one timestep, ``time`` chunks are always size 1 regardless of the value given here. To get coarser chunks along ``time``, rechunk afterwards with ``ds.chunk({"time": desired_chunk_size})``.
-
