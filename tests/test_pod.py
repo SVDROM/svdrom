@@ -10,6 +10,142 @@ from svdrom import POD
 N_MODES = 10
 
 
+def test_covariance_pod_matches_direct_svd() -> None:
+    """The covariance backend recovers the exact leading real-data POD modes."""
+    rng = np.random.default_rng(7)
+    values = rng.normal(size=(6, 40)) + np.arange(6)[:, None]
+    data = xr.DataArray(
+        da.from_array(values, chunks=(6, 7)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABCDEF"), "time": np.arange(40)},
+    )
+    model = POD(
+        n_modes=4,
+        svd_algorithm="covariance",
+        compute_time_coeffs=False,
+        compute_energy_ratio=True,
+    ).fit(data)
+
+    centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(40)
+    expected_modes, expected_s, _ = np.linalg.svd(centered, full_matrices=False)
+    np.testing.assert_allclose(model.s, expected_s[:4], rtol=1e-10)
+    np.testing.assert_allclose(
+        model.explained_energy_ratio,
+        expected_s[:4] ** 2 / np.sum(expected_s**2),
+        rtol=1e-10,
+    )
+    np.testing.assert_allclose(
+        np.abs(model.modes.data.T @ expected_modes[:, :4]),
+        np.eye(4),
+        atol=1e-10,
+    )
+    assert isinstance(model.time_coeffs.data, da.Array)
+    assert isinstance(model.v.data, da.Array)
+    np.testing.assert_allclose(
+        model.transform(data).data,
+        model.time_coeffs.compute().data,
+        atol=1e-10,
+    )
+
+
+def test_covariance_pod_rejects_zero_energy_and_extra_arguments() -> None:
+    """The covariance fit reports undefined energy and unsupported SVD options."""
+    data = xr.DataArray(
+        da.zeros((3, 12), chunks=(3, 4)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABC"), "time": np.arange(12)},
+    )
+    with pytest.raises(ValueError, match="zero total energy"):
+        POD(n_modes=2, svd_algorithm="covariance").fit(data)
+    with pytest.raises(TypeError, match="does not accept SVD keyword arguments"):
+        POD(n_modes=2, svd_algorithm="covariance").fit(data, seed=0)
+
+
+def test_covariance_pod_lazy_modes_and_training_reconstruction() -> None:
+    """The covariance backend honors compute flags and reconstructs snapshots."""
+    rng = np.random.default_rng(19)
+    values = rng.normal(size=(5, 24))
+    data = xr.DataArray(
+        da.from_array(values, chunks=(5, 6)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABCDE"), "time": np.arange(24)},
+    )
+    model = POD(
+        n_modes=3,
+        svd_algorithm="covariance",
+        compute_modes=False,
+        compute_time_coeffs=True,
+        compute_energy_ratio=False,
+    ).fit(data)
+
+    assert isinstance(model.modes.data, da.Array)
+    assert isinstance(model.time_coeffs.data, np.ndarray)
+    assert isinstance(model.explained_energy_ratio, da.Array)
+    expected = values.mean(axis=1) + model.modes.compute().data @ (
+        model.modes.compute().data.T @ (values[:, 0] - values.mean(axis=1))
+    )
+    np.testing.assert_allclose(model.reconstruct(0).data, expected)
+
+
+@pytest.mark.parametrize("compute", [True, False])
+def test_covariance_extended_pod_zero_energy_modes(compute: bool) -> None:
+    """Null modes extend to zero while positive-energy modes retain correlation."""
+    values = np.zeros((3, 12))
+    values[0] = np.tile([-1.0, 1.0], 6)
+    data = xr.DataArray(
+        da.from_array(values, chunks=(3, 4)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABC"), "time": np.arange(12)},
+    )
+    model = POD(
+        n_modes=2,
+        svd_algorithm="covariance",
+        compute_time_coeffs=False,
+    ).fit(data)
+    assert model.energy[1] == 0
+
+    extended = model.extended_pod(data, compute=compute)
+    assert isinstance(extended.data, np.ndarray if compute else da.Array)
+    result = extended.compute().data
+    assert np.isfinite(result).all()
+    np.testing.assert_array_equal(result[:, 1], np.zeros(3))
+    np.testing.assert_allclose(result[:, 0], model.modes.data[:, 0])
+    assert model.energy[1] == 0
+
+
+@pytest.mark.parametrize("dtype", ["float32", "float64", "complex64", "complex128"])
+@pytest.mark.parametrize("compute_time_coeffs", [True, False])
+def test_covariance_pod_temporal_precision(
+    dtype: str, compute_time_coeffs: bool
+) -> None:
+    """Large temporal outputs retain input precision and honor compute flags."""
+    rng = np.random.default_rng(53)
+    values = rng.normal(size=(4, 20))
+    if np.issubdtype(np.dtype(dtype), np.complexfloating):
+        values = values + 1j * rng.normal(size=values.shape)
+    data = xr.DataArray(
+        da.from_array(values.astype(dtype), chunks=(2, 5)),
+        dims=("channel", "time"),
+    )
+    model = POD(
+        n_modes=3,
+        svd_algorithm="covariance",
+        compute_time_coeffs=compute_time_coeffs,
+        compute_energy_ratio=True,
+    ).fit(data)
+
+    assert model.v.dtype == np.dtype(dtype)
+    assert model.time_coeffs.dtype == np.dtype(dtype)
+    backing_type = np.ndarray if compute_time_coeffs else da.Array
+    assert isinstance(model.v.data, backing_type)
+    assert isinstance(model.time_coeffs.data, backing_type)
+    assert model.s.dtype == np.dtype("float64")
+
+    model.compute_time_coeffs()
+    assert isinstance(model.time_coeffs.data, np.ndarray)
+    assert model.time_coeffs.dtype == np.dtype(dtype)
+
+
 def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
     """Make a Dask-backed DataArray with random data of
     specified matrix type.
@@ -758,3 +894,26 @@ def test_extended_pod_different_matrix_types(matrix_type):
     assert isinstance(
         chi.data, np.ndarray
     ), f"Expected numpy-backed DataArray, got {type(chi.data)}."
+
+
+@pytest.mark.parametrize("chunks", [(6, 7), (2, 11), (6, 40)])
+def test_covariance_pod_rank_deficiency_and_chunking(chunks: tuple[int, int]) -> None:
+    """A rank-two signal is recovered across channel and sample chunk layouts."""
+    rng = np.random.default_rng(43)
+    values = (rng.normal(size=(6, 2)) @ rng.normal(size=(2, 40))).astype(np.float32)
+    data = xr.DataArray(da.from_array(values, chunks=chunks), dims=("channel", "time"))
+    model = POD(n_modes=4, svd_algorithm="covariance", compute_time_coeffs=False).fit(
+        data
+    )
+    centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(40)
+    expected_s = np.linalg.svd(centered, compute_uv=False)
+    np.testing.assert_allclose(model.s[:2], expected_s[:2], rtol=2e-6)
+    coefficients = model.time_coeffs.compute().data
+    assert np.isfinite(coefficients).all()
+    recovered = model.modes.data @ coefficients * np.sqrt(40) + values.mean(
+        axis=1, keepdims=True
+    )
+    np.testing.assert_allclose(recovered, values, atol=2e-6)
+    np.testing.assert_allclose(
+        model.modes.data.T @ model.modes.data, np.eye(4), atol=1e-12
+    )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
@@ -23,19 +24,21 @@ class POD(TruncatedSVD):
 
     where X' is the (optionally mean-removed) fluctuating field, phi_j
     are the POD spatial modes, and a_j are the corresponding time
-    coefficients. Internally this is computed via a truncated SVD of
-    X' (scaled by 1/sqrt(n_snapshots) so that modal energy does not
-    depend on the number of snapshots), inheriting the SVD backend
-    and lazy/eager compute behaviour from `TruncatedSVD`.
+    coefficients. Internally this is computed via a truncated SVD or a
+    spatial covariance eigendecomposition of X' (scaled by
+    1/sqrt(n_snapshots) so that modal energy does not depend on the
+    number of snapshots).
 
     Parameters
     ----------
     n_modes: int
         Number of POD modes to compute. Must be less than
         min(n_spatial_points, n_snapshots).
-    svd_algorithm: str, {'tsqr', 'randomized'}, (default 'tsqr')
-        SVD algorithm used as the backend. See `TruncatedSVD` for
-        details on the trade-offs between the two algorithms.
+    svd_algorithm: str, {'tsqr', 'randomized', 'covariance'}, (default 'tsqr')
+        SVD algorithm used as the backend. ``covariance`` decomposes the
+        spatial covariance matrix as an alternative to TSQR for arrays with
+        many more snapshots than spatial points. See `TruncatedSVD` for
+        details on the other two algorithms.
     compute_modes: bool, (default True)
         Whether to eagerly compute the POD spatial modes. If False,
         `modes` is returned as a lazy Dask collection until
@@ -165,6 +168,40 @@ class POD(TruncatedSVD):
         self._scale_factor = n_snapshots**0.5
         return X / self._scale_factor
 
+    def _fit_covariance(self, X: xr.DataArray) -> None:
+        """Fit spatial modes from a small covariance matrix computed by blocks."""
+        self._check_array(X)
+        values = X.data
+        accumulation_dtype = np.result_type(values.dtype, np.float64)
+        precise_values = values.astype(accumulation_dtype)
+        covariance = (precise_values @ precise_values.conj().T).compute()
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+        order = np.argsort(eigenvalues)[::-1][: self._n_components]
+        eigenvalues = np.maximum(eigenvalues[order], 0)
+        modes = eigenvectors[:, order]
+        singular_values = np.sqrt(eigenvalues)
+
+        total_energy = float(np.trace(covariance).real)
+        if total_energy <= 0:
+            msg = "POD covariance has zero total energy."
+            raise ValueError(msg)
+
+        safe_values = np.where(singular_values > 0, singular_values, np.inf)
+        modes_lazy = da.from_array(modes)
+        output_dtype = np.result_type(values.dtype, np.float32)
+        temporal_vectors = (
+            (modes_lazy.conj().T @ precise_values) / safe_values[:, None]
+        ).astype(output_dtype)
+
+        mode_values = modes if self._compute_u else modes_lazy
+        self._u = self._singular_vectors_to_dataarray(mode_values, X, kind="u")
+        self._s = singular_values
+        self._v = self._singular_vectors_to_dataarray(temporal_vectors, X, kind="v")
+        ratios = eigenvalues / total_energy
+        self._explained_var_ratio = (
+            ratios if self._compute_var_ratio else da.from_array(ratios)
+        )
+
     def fit(
         self,
         X: xr.DataArray,
@@ -181,6 +218,7 @@ class POD(TruncatedSVD):
             Additional keyword arguments to pass to the randomized
             SVD algorithm used as a backend for the POD computation.
             See dask.array.linalg.svd_compressed for more details.
+            The covariance algorithm accepts no additional arguments.
         """
         if self._time_dim not in X.dims:
             msg = (
@@ -202,12 +240,30 @@ class POD(TruncatedSVD):
             logger.error(msg)
             raise ValueError(msg)
 
+        if self._algorithm == "covariance" and kwargs:
+            msg = "The covariance POD algorithm does not accept SVD keyword arguments."
+            raise TypeError(msg)
+
         X = self._preprocess_array(X)
-        super().fit(X, **kwargs)
+        if self._algorithm == "covariance":
+            self._fit_covariance(X)
+        else:
+            super().fit(X, **kwargs)
         assert isinstance(self._s, np.ndarray)
         assert isinstance(self._v, xr.DataArray)
+        coefficients = self._s.reshape(-1, 1) * self._v.data
+        if self._algorithm == "covariance":
+            # Cast before evaluation: float64 singular values otherwise
+            # promote the entire temporal coefficient array back to float64.
+            output_dtype = np.result_type(X.dtype, np.float32)
+            coefficients = coefficients.astype(output_dtype)
+            if self._compute_v:
+                temporal_vectors, coefficients = dask.compute(
+                    self._v.data, coefficients
+                )
+                self._v = self._v.copy(data=temporal_vectors)
         self._time_coeffs = xr.DataArray(
-            self._s.reshape(-1, 1) * self._v.data,
+            coefficients,
             dims=self._v.dims,
             coords=self._v.coords,
             attrs=self._v.attrs,
@@ -273,6 +329,7 @@ class POD(TruncatedSVD):
         unit-norm. Their norm quantifies the spatial energy in C' that
         is linearly correlated with mode j, and can be used to define a
         scalar correlation coefficient (Boree, 2003).
+        Selected zero-energy modes return zero extended modes.
 
         Note: the stored `time_coeffs` attribute equals a_ij / sqrt(N),
         so the formula as implemented becomes:
@@ -339,9 +396,11 @@ class POD(TruncatedSVD):
 
         C_prime = C - C.mean(dim=self._time_dim) if remove_mean else C
 
-        energy = self._s**2
-        # Extended POD: chi = (1 / scale_factor) * C' @ A^T @ Lambda^{-1}
-        chi = C_prime @ self._time_coeffs.T / (self._scale_factor * energy)
+        energy_denominator = self._s**2
+        energy_denominator[energy_denominator == 0] = np.inf
+        chi = (C_prime @ self._time_coeffs.T) / (
+            self._scale_factor * energy_denominator
+        )
 
         space_dim = next(d for d in C.dims if d != self._time_dim)
         chi = xr.DataArray(

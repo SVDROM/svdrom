@@ -21,7 +21,7 @@ The POD module provides access to the ``POD`` class, which computes the Proper O
 
     :param n_modes: Number of POD modes to compute (the truncation rank :math:`k`). Must be strictly less than ``min(n_spatial_points, n_snapshots)``.
     :type n_modes: int
-    :param svd_algorithm: SVD back-end used internally. Must be one of ``{"tsqr", "randomized"}``. See :py:class:`svd.TruncatedSVD` for the trade-offs between the two algorithms. Default is ``"tsqr"``.
+    :param svd_algorithm: SVD back-end used internally. Must be one of ``{"tsqr", "randomized", "covariance"}``. The ``"covariance"`` option computes the small spatial covariance matrix block by block before diagonalizing it. This is useful when there are far fewer spatial points than time snapshots; it avoids materializing a large temporal factor when *compute_time_coeffs* is ``False``. Its condition number is squared relative to a direct SVD, so use ``"tsqr"`` when fine numerical accuracy of weak modes matters. See :py:class:`svd.TruncatedSVD` for the trade-offs between the other two algorithms. Default is ``"tsqr"``.
     :type svd_algorithm: str
     :param compute_modes: Whether to eagerly compute the POD spatial modes during :py:meth:`fit`. If ``False``, :py:attr:`modes` is returned as a lazy Dask collection until :py:meth:`compute_modes` is called. Default is ``True``.
     :type compute_modes: bool
@@ -71,7 +71,7 @@ The POD module provides access to the ``POD`` class, which computes the Proper O
 
         :param X: Input snapshot matrix with shape ``(n_spatial_points, n_snapshots)``. Must be a Dask-backed ``xarray.DataArray`` containing *time_dimension*.
         :type X: xarray.DataArray
-        :param \**kwargs: Additional keyword arguments forwarded to ``dask.array.linalg.svd_compressed`` when *svd_algorithm* is ``"randomized"`` (e.g. ``n_power_iter``, ``n_oversamples``, ``seed``). Ignored when *svd_algorithm* is ``"tsqr"``.
+        :param \**kwargs: Additional keyword arguments forwarded to ``dask.array.linalg.svd_compressed`` when *svd_algorithm* is ``"randomized"`` (e.g. ``n_power_iter``, ``n_oversamples``, ``seed``). Ignored when *svd_algorithm* is ``"tsqr"``; not accepted when it is ``"covariance"``.
         :returns: The fitted instance (``self``), allowing method chaining.
         :rtype: POD
         :raises ValueError: If *time_dimension* is not a dimension of *X*, or if *n_modes* is not strictly less than ``min(n_spatial_points, n_snapshots)``.
