@@ -664,7 +664,7 @@ class OptDMD(DecompositionModel):
             raise RuntimeError(msg)
         target_chunk_bytes = parse_bytes(dask.config.get("array.chunk-size"))
         bytes_per_snapshot = self._modes[:, 0].nbytes
-        time_chunk_size = round(target_chunk_bytes / bytes_per_snapshot)
+        time_chunk_size = max(round(target_chunk_bytes / bytes_per_snapshot), 1)
         return arr.rechunk((-1, time_chunk_size))
 
     def _prediction_to_dataarray(

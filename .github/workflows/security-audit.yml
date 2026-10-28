@@ -8,7 +8,7 @@ on:
       - "pyproject.toml"
       - ".github/workflows/security-audit.yml"
   schedule:
-    - cron: "0 7 * * 1"  # Mondays at 07:00 UTC
+    - cron: "23 7 * * 1"  # Mondays at 07:23 UTC (off the hour to avoid dropped runs)
 
 jobs:
   uv-audit:
