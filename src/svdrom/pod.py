@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
@@ -35,9 +36,9 @@ class POD(TruncatedSVD):
         min(n_spatial_points, n_snapshots).
     svd_algorithm: str, {'tsqr', 'randomized', 'covariance'}, (default 'tsqr')
         SVD algorithm used as the backend. ``covariance`` decomposes the
-        spatial covariance matrix and is suited to arrays with many more
-        snapshots than spatial points. See `TruncatedSVD` for details on
-        the other two algorithms.
+        spatial covariance matrix as an alternative to TSQR for arrays with
+        many more snapshots than spatial points. See `TruncatedSVD` for
+        details on the other two algorithms.
     compute_modes: bool, (default True)
         Whether to eagerly compute the POD spatial modes. If False,
         `modes` is returned as a lazy Dask collection until
@@ -187,9 +188,10 @@ class POD(TruncatedSVD):
 
         safe_values = np.where(singular_values > 0, singular_values, np.inf)
         modes_lazy = da.from_array(modes)
-        temporal_vectors = (modes_lazy.conj().T @ values) / safe_values[:, None]
-        if self._compute_v:
-            temporal_vectors = temporal_vectors.compute()
+        output_dtype = np.result_type(values.dtype, np.float32)
+        temporal_vectors = (
+            (modes_lazy.conj().T @ precise_values) / safe_values[:, None]
+        ).astype(output_dtype)
 
         mode_values = modes if self._compute_u else modes_lazy
         self._u = self._singular_vectors_to_dataarray(mode_values, X, kind="u")
@@ -249,8 +251,19 @@ class POD(TruncatedSVD):
             super().fit(X, **kwargs)
         assert isinstance(self._s, np.ndarray)
         assert isinstance(self._v, xr.DataArray)
+        coefficients = self._s.reshape(-1, 1) * self._v.data
+        if self._algorithm == "covariance":
+            # Cast before evaluation: float64 singular values otherwise
+            # promote the entire temporal coefficient array back to float64.
+            output_dtype = np.result_type(X.dtype, np.float32)
+            coefficients = coefficients.astype(output_dtype)
+            if self._compute_v:
+                temporal_vectors, coefficients = dask.compute(
+                    self._v.data, coefficients
+                )
+                self._v = self._v.copy(data=temporal_vectors)
         self._time_coeffs = xr.DataArray(
-            self._s.reshape(-1, 1) * self._v.data,
+            coefficients,
             dims=self._v.dims,
             coords=self._v.coords,
             attrs=self._v.attrs,
@@ -316,6 +329,7 @@ class POD(TruncatedSVD):
         unit-norm. Their norm quantifies the spatial energy in C' that
         is linearly correlated with mode j, and can be used to define a
         scalar correlation coefficient (Boree, 2003).
+        Selected zero-energy modes return zero extended modes.
 
         Note: the stored `time_coeffs` attribute equals a_ij / sqrt(N),
         so the formula as implemented becomes:
@@ -382,9 +396,11 @@ class POD(TruncatedSVD):
 
         C_prime = C - C.mean(dim=self._time_dim) if remove_mean else C
 
-        energy = self._s**2
-        # Extended POD: chi = (1 / scale_factor) * C' @ A^T @ Lambda^{-1}
-        chi = C_prime @ self._time_coeffs.T / (self._scale_factor * energy)
+        energy_denominator = self._s**2
+        energy_denominator[energy_denominator == 0] = np.inf
+        chi = (C_prime @ self._time_coeffs.T) / (
+            self._scale_factor * energy_denominator
+        )
 
         space_dim = next(d for d in C.dims if d != self._time_dim)
         chi = xr.DataArray(
