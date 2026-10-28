@@ -87,6 +87,65 @@ def test_covariance_pod_lazy_modes_and_training_reconstruction() -> None:
     np.testing.assert_allclose(model.reconstruct(0).data, expected)
 
 
+@pytest.mark.parametrize("compute", [True, False])
+def test_covariance_extended_pod_zero_energy_modes(compute: bool) -> None:
+    """Null modes extend to zero while positive-energy modes retain correlation."""
+    values = np.zeros((3, 12))
+    values[0] = np.tile([-1.0, 1.0], 6)
+    data = xr.DataArray(
+        da.from_array(values, chunks=(3, 4)),
+        dims=("channel", "time"),
+        coords={"channel": list("ABC"), "time": np.arange(12)},
+    )
+    model = POD(
+        n_modes=2,
+        svd_algorithm="covariance",
+        compute_time_coeffs=False,
+    ).fit(data)
+    assert model.energy[1] == 0
+
+    extended = model.extended_pod(data, compute=compute)
+    assert isinstance(extended.data, np.ndarray if compute else da.Array)
+    result = extended.compute().data
+    assert np.isfinite(result).all()
+    np.testing.assert_array_equal(result[:, 1], np.zeros(3))
+    np.testing.assert_allclose(result[:, 0], model.modes.data[:, 0])
+    assert model.energy[1] == 0
+
+
+@pytest.mark.parametrize("dtype", ["float32", "float64", "complex64", "complex128"])
+@pytest.mark.parametrize("compute_time_coeffs", [True, False])
+def test_covariance_pod_temporal_precision(
+    dtype: str, compute_time_coeffs: bool
+) -> None:
+    """Large temporal outputs retain input precision and honor compute flags."""
+    rng = np.random.default_rng(53)
+    values = rng.normal(size=(4, 20))
+    if np.issubdtype(np.dtype(dtype), np.complexfloating):
+        values = values + 1j * rng.normal(size=values.shape)
+    data = xr.DataArray(
+        da.from_array(values.astype(dtype), chunks=(2, 5)),
+        dims=("channel", "time"),
+    )
+    model = POD(
+        n_modes=3,
+        svd_algorithm="covariance",
+        compute_time_coeffs=compute_time_coeffs,
+        compute_energy_ratio=True,
+    ).fit(data)
+
+    assert model.v.dtype == np.dtype(dtype)
+    assert model.time_coeffs.dtype == np.dtype(dtype)
+    backing_type = np.ndarray if compute_time_coeffs else da.Array
+    assert isinstance(model.v.data, backing_type)
+    assert isinstance(model.time_coeffs.data, backing_type)
+    assert model.s.dtype == np.dtype("float64")
+
+    model.compute_time_coeffs()
+    assert isinstance(model.time_coeffs.data, np.ndarray)
+    assert model.time_coeffs.dtype == np.dtype(dtype)
+
+
 def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
     """Make a Dask-backed DataArray with random data of
     specified matrix type.
