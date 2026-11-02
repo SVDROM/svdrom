@@ -22,8 +22,15 @@ jobs:
       - name: Audit locked dependencies
         # apache-beam (weather extra, via weatherbench2) caps cryptography <49;
         # drop these ignores once it allows cryptography>=50.
+        # dnspython (fixed in 2.9.0) and tornado (fixed in 6.6): the fixed
+        # releases require Python >=3.11, so the Python 3.10 fork of uv.lock
+        # stays on dnspython 2.8.0 / tornado 6.5.10 (3.11+ resolves the fixed
+        # versions); drop these ignores once a fix ships for Python 3.10 or
+        # svdrom drops Python 3.10.
         run: >-
           uv audit --locked --preview-features audit-command
           --ignore PYSEC-2026-3554 --ignore GHSA-m2h6-j472-rp4c
           --ignore PYSEC-2026-3553 --ignore GHSA-jwv3-5hgf-82ww
           --ignore PYSEC-2026-3552 --ignore GHSA-g6cj-pr64-35w5
+          --ignore GHSA-45c3-73f7-pv4m
+          --ignore GHSA-pw9p-v7r6-gx4p --ignore GHSA-r4j5-9xpp-3985 --ignore GHSA-pcg2-g6cj-q92c
