@@ -10,6 +10,40 @@ from svdrom import POD
 N_MODES = 10
 
 
+@pytest.mark.parametrize("svd_algorithm", ["tsqr", "randomized", "covariance"])
+@pytest.mark.parametrize("compute", [True, False])
+def test_complex_transform_matches_time_coeffs(
+    svd_algorithm: str, compute: bool
+) -> None:
+    """Projecting complex training data reproduces the fitted coefficients."""
+    rng = np.random.default_rng(61)
+    # Exact rank 3 (preserved by centering) so 3 modes reconstruct exactly
+    # while n_modes stays below min(shape), as required by _check_array.
+    left = rng.normal(size=(5, 3)) + 1j * rng.normal(size=(5, 3))
+    right = rng.normal(size=(3, 30)) + 1j * rng.normal(size=(3, 30))
+    values = left @ right
+    data = xr.DataArray(
+        da.from_array(values, chunks=(5, 10)),
+        dims=("channel", "time"),
+    )
+    model = POD(
+        n_modes=3,
+        svd_algorithm=svd_algorithm,
+        compute_modes=True,
+        compute_time_coeffs=True,
+    ).fit(data)
+
+    projected = model.transform(data, compute=compute)
+    assert isinstance(projected.data, np.ndarray if compute else da.Array)
+    coefficients = projected.compute().data
+    np.testing.assert_allclose(coefficients, model.time_coeffs.data, atol=1e-10)
+
+    # Full-rank reconstruction holds only for the Hermitian projection, so this
+    # checks correctness independently of the fitted coefficients.
+    centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(30)
+    np.testing.assert_allclose(model.modes.data @ coefficients, centered, atol=1e-10)
+
+
 def test_covariance_pod_matches_direct_svd() -> None:
     """The covariance backend recovers the exact leading real-data POD modes."""
     rng = np.random.default_rng(7)
