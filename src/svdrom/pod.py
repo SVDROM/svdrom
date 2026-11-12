@@ -458,8 +458,9 @@ class POD(TruncatedSVD):
         X = X / self._scale_factor
 
         # Project onto POD modes (proper POD projection)
+        # Use the Hermitian transpose so complex projections match fit().
         if compute:
-            result = (self._u.T @ X).compute()
+            result = (self._u.conj().T @ X).compute()
         else:
             # Ensure lazy computation by using Dask-backed u
             if isinstance(self._u.data, np.ndarray):
@@ -468,9 +469,9 @@ class POD(TruncatedSVD):
                     dims=self._u.dims,
                     coords=self._u.coords,
                 )
-                result = u_lazy.T @ X
+                result = u_lazy.conj().T @ X
             else:
-                result = self._u.T @ X
+                result = self._u.conj().T @ X
 
         return result
 
