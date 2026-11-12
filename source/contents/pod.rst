@@ -147,7 +147,7 @@ The POD module provides access to the ``POD`` class, which computes the Proper O
 
     .. code-block:: python
 
-        from svdrom.pod import POD
+        from svdrom import POD
 
         pod = POD(n_modes=10)
         pod.fit(X)

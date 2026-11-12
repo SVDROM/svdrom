@@ -1,3 +1,11 @@
+<!-- markdownlint-disable MD033 MD041 -->
+<!-- Logo URL is pinned to a commit SHA so it renders on GitHub and on PyPI, which
+     cannot resolve relative paths. Bump the SHA if the logo image is ever replaced. -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SVDROM/svdrom/bde2284287089eeba0db173c835e76ecdaf34b5c/source/media/svdrom-logo.png" alt="SVD-ROM logo" width="220">
+</p>
+<!-- markdownlint-restore -->
+
 # SVD-ROM
 
 [![Actions Status][actions-badge]][actions-link]
@@ -29,10 +37,10 @@ cd svdrom
 python -m pip install .
 ```
 
-It is strongly recommended to install SVD-ROM using [uv](https://docs.astral.sh/uv/):
+It is strongly recommended to install SVD-ROM using [uv](https://docs.astral.sh/uv/).
+Create a virtual environment with any supported Python version (3.10, 3.11, or 3.12), then install the package:
 ```bash
-uv venv
-source .venv/bin/activate
+uv venv --python 3.12
 uv pip install .
 ```
 
@@ -53,6 +61,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
 
 Distributed under the terms of the [MIT license](LICENSE).
 
+## Useful references
+
+The following references provide useful background information on SVD-ROM:
+
+* Salvador-Jasin, D., Vava, R., Strickson, O., van Zeeland, L., France, L., Eiximeno Franch, B., Yatsyshin, P., Hosking, S. & Kutz, J. N. (2026). SVD-ROM: Scalable Reduced Order Modeling of Weather and Climate Data Using the Singular Value Decomposition. Zenodo. Climate Informatics 2026, Lausanne (Switzerland). https://doi.org/10.5281/zenodo.19710711
+* Salvador Jasin, D. (2026, February 3). SVD-ROM: Reduced Order Modeling of huge arrays using the Singular Value Decomposition. Zenodo. PyData London Meetup, London. https://doi.org/10.5281/zenodo.18468075
+
 ## Contributors
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
@@ -63,6 +78,11 @@ Distributed under the terms of the [MIT license](LICENSE).
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/robertvava"><img src="https://avatars.githubusercontent.com/u/77018483?v=4?s=100" width="100px;" alt="Robert Vava"/><br /><sub><b>Robert Vava</b></sub></a><br /><a href="https://github.com/SVDROM/svdrom/pulls?q=is%3Apr+reviewed-by%3Arobertvava" title="Reviewed Pull Requests">👀</a> <a href="https://github.com/SVDROM/svdrom/commits?author=robertvava" title="Code">💻</a> <a href="#maintenance-robertvava" title="Maintenance">🚧</a> <a href="https://github.com/SVDROM/svdrom/commits?author=robertvava" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/dsj976"><img src="https://avatars.githubusercontent.com/u/57944311?v=4?s=100" width="100px;" alt="David Salvador Jasin"/><br /><sub><b>David Salvador Jasin</b></sub></a><br /><a href="https://github.com/SVDROM/svdrom/commits?author=dsj976" title="Code">💻</a> <a href="#maintenance-dsj976" title="Maintenance">🚧</a> <a href="https://github.com/SVDROM/svdrom/pulls?q=is%3Apr+reviewed-by%3Adsj976" title="Reviewed Pull Requests">👀</a> <a href="#infra-dsj976" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="https://github.com/SVDROM/svdrom/commits?author=dsj976" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/louisavz"><img src="https://avatars.githubusercontent.com/u/63079440?v=4?s=100" width="100px;" alt="louisavz"/><br /><sub><b>louisavz</b></sub></a><br /><a href="#research-louisavz" title="Research">🔬</a> <a href="#ideas-louisavz" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LydiaFrance"><img src="https://avatars.githubusercontent.com/u/85945427?v=4?s=100" width="100px;" alt="Lydia France"/><br /><sub><b>Lydia France</b></sub></a><br /><a href="#research-LydiaFrance" title="Research">🔬</a> <a href="#ideas-LydiaFrance" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ots22"><img src="https://avatars.githubusercontent.com/u/5434836?v=4?s=100" width="100px;" alt="ots22"/><br /><sub><b>ots22</b></sub></a><br /><a href="#research-ots22" title="Research">🔬</a> <a href="#ideas-ots22" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://www.yatsyshin.com/"><img src="https://avatars.githubusercontent.com/u/20075514?v=4?s=100" width="100px;" alt="Peter Yatsyshin"/><br /><sub><b>Peter Yatsyshin</b></sub></a><br /><a href="#research-pyatsysh" title="Research">🔬</a> <a href="#ideas-pyatsysh" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/bef-18"><img src="https://avatars.githubusercontent.com/u/61317743?v=4?s=100" width="100px;" alt="bef-18"/><br /><sub><b>bef-18</b></sub></a><br /><a href="#ideas-bef-18" title="Ideas, Planning, & Feedback">🤔</a> <a href="#research-bef-18" title="Research">🔬</a></td>
     </tr>
   </tbody>
 </table>

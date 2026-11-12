@@ -12,9 +12,8 @@ from pydmd import BOPDMD
 from pydmd.preprocessing import hankel_preprocessing as hankel_preprocessing_pydmd
 
 import svdrom.config as config
-from svdrom.dmd import OptDMD
+from svdrom import OptDMD, TruncatedSVD
 from svdrom.preprocessing import hankel_preprocessing
-from svdrom.svd import TruncatedSVD
 
 # set the dask scheduler to single-threaded
 dask.config.set(scheduler="single-threaded")
@@ -88,6 +87,44 @@ class BaseTestOptDMD:
             varpro_opts_dict={"maxiter": 15},
             eig_sort="imag",
         )
+
+    def test_rechunk_along_columns(self):
+        """Test rechunking uses a positive number of time columns."""
+        solver = self.optdmd
+        solver.fit(
+            self.u,
+            self.s,
+            self.v,
+            varpro_opts_dict={"maxiter": 15},
+            eig_sort="imag",
+        )
+        arr = da.ones((5, 20), chunks=(5, 20))
+
+        with dask.config.set({"array.chunk-size": "1B"}):
+            rechunked = solver._rechunk_along_columns(arr)
+            assert (
+                rechunked.shape == arr.shape
+            ), "Expected rechunking to preserve the array shape."
+            assert rechunked.chunks[1] == (1,) * 20, (
+                "Expected a time chunk size of 1 when one snapshot exceeds the "
+                "Dask chunk-size limit."
+            )
+            assert rechunked.chunks[0] == (
+                5,
+            ), "Expected the rows to remain in a single chunk."
+            np.testing.assert_array_equal(
+                rechunked.compute(),
+                arr.compute(),
+                err_msg="Expected rechunking to preserve the array values.",
+            )
+
+        rechunked = solver._rechunk_along_columns(arr)
+        assert (
+            rechunked.shape == arr.shape
+        ), "Expected rechunking to preserve the array shape."
+        assert all(
+            chunk >= 1 for chunk in rechunked.chunks[1]
+        ), "Expected all time chunks to contain at least one column."
 
     @pytest.mark.parametrize("solver", ["optdmd", "optdmd_bagging"])
     def test_fit_outputs(self, solver):

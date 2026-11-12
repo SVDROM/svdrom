@@ -15,6 +15,7 @@
 
 ## Testing Guidelines
 - Write unit tests for all new functions
+- Give every assertion a descriptive message (`assert cond, "Expected ..."`, or `err_msg="Expected ..."` for `np.testing` helpers)
 - Aim for >80% code coverage
 - Run tests before committing
 

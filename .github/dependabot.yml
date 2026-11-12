@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    ignore:
+      # apache-beam (weather extra, via weatherbench2) caps cryptography. A major
+      # cryptography bump forces beam/pyarrow downgrades that reintroduce known
+      # vulnerabilities (see #97). Remove once apache-beam allows newer majors.
+      - dependency-name: "cryptography"
+        update-types:
+          - "version-update:semver-major"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      actions-major:
+        update-types:
+          - "major"
