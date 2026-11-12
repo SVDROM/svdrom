@@ -10,12 +10,23 @@ from svdrom import POD
 N_MODES = 10
 
 
-@pytest.mark.parametrize("svd_algorithm", ["tsqr", "randomized", "covariance"])
+@pytest.mark.parametrize(
+    "svd_algorithm",
+    [
+        pytest.param(
+            "tsqr",
+            marks=pytest.mark.filterwarnings("ignore::numpy.exceptions.ComplexWarning"),
+        ),
+        "covariance",
+    ],
+)
 @pytest.mark.parametrize("compute", [True, False])
-def test_complex_transform_matches_time_coeffs(
-    svd_algorithm: str, compute: bool
-) -> None:
-    """Projecting complex training data reproduces the fitted coefficients."""
+def test_complex_transform_matches_time_coeffs(svd_algorithm, compute):
+    """Complex projection reproduces fitted coefficients with supported backends.
+
+    TSQR's ComplexWarning is a spurious Dask metadata cast. Randomized SVD
+    is excluded because it does not support complex data and raises TypeError.
+    """
     rng = np.random.default_rng(61)
     # Exact rank 3 (preserved by centering) so 3 modes reconstruct exactly
     # while n_modes stays below min(shape), as required by _check_array.
@@ -34,17 +45,29 @@ def test_complex_transform_matches_time_coeffs(
     ).fit(data)
 
     projected = model.transform(data, compute=compute)
-    assert isinstance(projected.data, np.ndarray if compute else da.Array)
+    assert isinstance(
+        projected.data, np.ndarray if compute else da.Array
+    ), "Expected projection backing to honor compute"
     coefficients = projected.compute().data
-    np.testing.assert_allclose(coefficients, model.time_coeffs.data, atol=1e-10)
+    np.testing.assert_allclose(
+        coefficients,
+        model.time_coeffs.data,
+        atol=1e-10,
+        err_msg="Expected projection to match fitted time coefficients",
+    )
 
     # Full-rank reconstruction holds only for the Hermitian projection, so this
     # checks correctness independently of the fitted coefficients.
     centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(30)
-    np.testing.assert_allclose(model.modes.data @ coefficients, centered, atol=1e-10)
+    np.testing.assert_allclose(
+        model.modes.data @ coefficients,
+        centered,
+        atol=1e-10,
+        err_msg="Expected complex modes and coefficients to reconstruct centered data",
+    )
 
 
-def test_covariance_pod_matches_direct_svd() -> None:
+def test_covariance_pod_matches_direct_svd():
     """The covariance backend recovers the exact leading real-data POD modes."""
     rng = np.random.default_rng(7)
     values = rng.normal(size=(6, 40)) + np.arange(6)[:, None]
@@ -62,27 +85,37 @@ def test_covariance_pod_matches_direct_svd() -> None:
 
     centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(40)
     expected_modes, expected_s, _ = np.linalg.svd(centered, full_matrices=False)
-    np.testing.assert_allclose(model.s, expected_s[:4], rtol=1e-10)
+    np.testing.assert_allclose(
+        model.s,
+        expected_s[:4],
+        rtol=1e-10,
+        err_msg="Expected covariance singular values to match direct SVD",
+    )
     np.testing.assert_allclose(
         model.explained_energy_ratio,
         expected_s[:4] ** 2 / np.sum(expected_s**2),
         rtol=1e-10,
+        err_msg="Expected energy ratios to match direct SVD",
     )
     np.testing.assert_allclose(
         np.abs(model.modes.data.T @ expected_modes[:, :4]),
         np.eye(4),
         atol=1e-10,
+        err_msg="Expected covariance modes to match direct SVD up to sign",
     )
-    assert isinstance(model.time_coeffs.data, da.Array)
-    assert isinstance(model.v.data, da.Array)
+    assert isinstance(
+        model.time_coeffs.data, da.Array
+    ), "Expected lazy time coefficients"
+    assert isinstance(model.v.data, da.Array), "Expected lazy temporal vectors"
     np.testing.assert_allclose(
         model.transform(data).data,
         model.time_coeffs.compute().data,
         atol=1e-10,
+        err_msg="Expected projection to match covariance time coefficients",
     )
 
 
-def test_covariance_pod_rejects_zero_energy_and_extra_arguments() -> None:
+def test_covariance_pod_rejects_zero_energy_and_extra_arguments():
     """The covariance fit reports undefined energy and unsupported SVD options."""
     data = xr.DataArray(
         da.zeros((3, 12), chunks=(3, 4)),
@@ -95,7 +128,7 @@ def test_covariance_pod_rejects_zero_energy_and_extra_arguments() -> None:
         POD(n_modes=2, svd_algorithm="covariance").fit(data, seed=0)
 
 
-def test_covariance_pod_lazy_modes_and_training_reconstruction() -> None:
+def test_covariance_pod_lazy_modes_and_training_reconstruction():
     """The covariance backend honors compute flags and reconstructs snapshots."""
     rng = np.random.default_rng(19)
     values = rng.normal(size=(5, 24))
@@ -112,17 +145,25 @@ def test_covariance_pod_lazy_modes_and_training_reconstruction() -> None:
         compute_energy_ratio=False,
     ).fit(data)
 
-    assert isinstance(model.modes.data, da.Array)
-    assert isinstance(model.time_coeffs.data, np.ndarray)
-    assert isinstance(model.explained_energy_ratio, da.Array)
+    assert isinstance(model.modes.data, da.Array), "Expected lazy spatial modes"
+    assert isinstance(
+        model.time_coeffs.data, np.ndarray
+    ), "Expected eager time coefficients"
+    assert isinstance(
+        model.explained_energy_ratio, da.Array
+    ), "Expected lazy energy ratios"
     expected = values.mean(axis=1) + model.modes.compute().data @ (
         model.modes.compute().data.T @ (values[:, 0] - values.mean(axis=1))
     )
-    np.testing.assert_allclose(model.reconstruct(0).data, expected)
+    np.testing.assert_allclose(
+        model.reconstruct(0).data,
+        expected,
+        err_msg="Expected reconstruction to match the modal projection plus mean",
+    )
 
 
 @pytest.mark.parametrize("compute", [True, False])
-def test_covariance_extended_pod_zero_energy_modes(compute: bool) -> None:
+def test_covariance_extended_pod_zero_energy_modes(compute):
     """Null modes extend to zero while positive-energy modes retain correlation."""
     values = np.zeros((3, 12))
     values[0] = np.tile([-1.0, 1.0], 6)
@@ -136,22 +177,28 @@ def test_covariance_extended_pod_zero_energy_modes(compute: bool) -> None:
         svd_algorithm="covariance",
         compute_time_coeffs=False,
     ).fit(data)
-    assert model.energy[1] == 0
+    assert model.energy[1] == 0, "Expected a zero-energy second mode"
 
     extended = model.extended_pod(data, compute=compute)
-    assert isinstance(extended.data, np.ndarray if compute else da.Array)
+    assert isinstance(
+        extended.data, np.ndarray if compute else da.Array
+    ), "Expected extended modes backing to honor compute"
     result = extended.compute().data
-    assert np.isfinite(result).all()
-    np.testing.assert_array_equal(result[:, 1], np.zeros(3))
-    np.testing.assert_allclose(result[:, 0], model.modes.data[:, 0])
-    assert model.energy[1] == 0
+    assert np.isfinite(result).all(), "Expected finite extended modes for null energy"
+    np.testing.assert_array_equal(
+        result[:, 1], np.zeros(3), err_msg="Expected null mode to extend to zero"
+    )
+    np.testing.assert_allclose(
+        result[:, 0],
+        model.modes.data[:, 0],
+        err_msg="Expected positive-energy mode to retain its correlation",
+    )
+    assert model.energy[1] == 0, "Expected extended POD not to modify null-mode energy"
 
 
 @pytest.mark.parametrize("dtype", ["float32", "float64", "complex64", "complex128"])
 @pytest.mark.parametrize("compute_time_coeffs", [True, False])
-def test_covariance_pod_temporal_precision(
-    dtype: str, compute_time_coeffs: bool
-) -> None:
+def test_covariance_pod_temporal_precision(dtype, compute_time_coeffs):
     """Large temporal outputs retain input precision and honor compute flags."""
     rng = np.random.default_rng(53)
     values = rng.normal(size=(4, 20))
@@ -168,16 +215,30 @@ def test_covariance_pod_temporal_precision(
         compute_energy_ratio=True,
     ).fit(data)
 
-    assert model.v.dtype == np.dtype(dtype)
-    assert model.time_coeffs.dtype == np.dtype(dtype)
+    assert model.v.dtype == np.dtype(
+        dtype
+    ), "Expected temporal vectors to retain input dtype"
+    assert model.time_coeffs.dtype == np.dtype(
+        dtype
+    ), "Expected coefficients to retain input dtype"
     backing_type = np.ndarray if compute_time_coeffs else da.Array
-    assert isinstance(model.v.data, backing_type)
-    assert isinstance(model.time_coeffs.data, backing_type)
-    assert model.s.dtype == np.dtype("float64")
+    assert isinstance(
+        model.v.data, backing_type
+    ), "Expected temporal vectors to honor compute flag"
+    assert isinstance(
+        model.time_coeffs.data, backing_type
+    ), "Expected coefficients to honor compute flag"
+    assert model.s.dtype == np.dtype(
+        "float64"
+    ), "Expected double-precision singular values"
 
     model.compute_time_coeffs()
-    assert isinstance(model.time_coeffs.data, np.ndarray)
-    assert model.time_coeffs.dtype == np.dtype(dtype)
+    assert isinstance(
+        model.time_coeffs.data, np.ndarray
+    ), "Expected computed NumPy coefficients"
+    assert model.time_coeffs.dtype == np.dtype(
+        dtype
+    ), "Expected computed coefficients to retain input dtype"
 
 
 def make_dataarray(matrix_type: str, time_dim_pos: int = 1) -> xr.DataArray:
@@ -931,7 +992,7 @@ def test_extended_pod_different_matrix_types(matrix_type):
 
 
 @pytest.mark.parametrize("chunks", [(6, 7), (2, 11), (6, 40)])
-def test_covariance_pod_rank_deficiency_and_chunking(chunks: tuple[int, int]) -> None:
+def test_covariance_pod_rank_deficiency_and_chunking(chunks):
     """A rank-two signal is recovered across channel and sample chunk layouts."""
     rng = np.random.default_rng(43)
     values = (rng.normal(size=(6, 2)) @ rng.normal(size=(2, 40))).astype(np.float32)
@@ -941,13 +1002,28 @@ def test_covariance_pod_rank_deficiency_and_chunking(chunks: tuple[int, int]) ->
     )
     centered = (values - values.mean(axis=1, keepdims=True)) / np.sqrt(40)
     expected_s = np.linalg.svd(centered, compute_uv=False)
-    np.testing.assert_allclose(model.s[:2], expected_s[:2], rtol=2e-6)
+    np.testing.assert_allclose(
+        model.s[:2],
+        expected_s[:2],
+        rtol=2e-6,
+        err_msg="Expected leading singular values to match for every chunk layout",
+    )
     coefficients = model.time_coeffs.compute().data
-    assert np.isfinite(coefficients).all()
+    assert np.isfinite(
+        coefficients
+    ).all(), "Expected finite coefficients for rank-deficient data"
     recovered = model.modes.data @ coefficients * np.sqrt(40) + values.mean(
         axis=1, keepdims=True
     )
-    np.testing.assert_allclose(recovered, values, atol=2e-6)
     np.testing.assert_allclose(
-        model.modes.data.T @ model.modes.data, np.eye(4), atol=1e-12
+        recovered,
+        values,
+        atol=2e-6,
+        err_msg="Expected rank-deficient signal reconstruction for every chunk layout",
+    )
+    np.testing.assert_allclose(
+        model.modes.data.T @ model.modes.data,
+        np.eye(4),
+        atol=1e-12,
+        err_msg="Expected orthonormal covariance modes including null modes",
     )

@@ -7,12 +7,33 @@ import pytest
 import xarray as xr
 
 import svdrom.config as config
-from svdrom import TruncatedSVD
+from svdrom import POD, TruncatedSVD
 from svdrom.preprocessing import hankel_preprocessing
 
 samples_coord_name = "samples"
 time_coord_name = "time"
 hankel_coord_name = config.get("hankel_coord_name")
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        TruncatedSVD(n_components=2, algorithm="randomized"),
+        POD(n_modes=2, svd_algorithm="randomized"),
+    ],
+)
+@pytest.mark.parametrize("dtype", ["complex64", "complex128"])
+def test_randomized_rejects_complex_data(model, dtype):
+    """Randomized SVD rejects complex input and suggests supported backends."""
+    data = xr.DataArray(
+        da.ones((4, 12), chunks=(4, 4), dtype=dtype) * (1 + 1j),
+        dims=("channel", "time"),
+    )
+    with pytest.raises(
+        TypeError,
+        match="Randomized SVD does not support complex data.*'tsqr'.*'covariance'",
+    ):
+        model.fit(data)
 
 
 def make_dataarray(matrix_type: str) -> xr.DataArray:

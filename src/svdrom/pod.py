@@ -38,7 +38,9 @@ class POD(TruncatedSVD):
         SVD algorithm used as the backend. ``covariance`` decomposes the
         spatial covariance matrix as an alternative to TSQR for arrays with
         many more snapshots than spatial points. See `TruncatedSVD` for
-        details on the other two algorithms.
+        details on the other two algorithms. ``tsqr`` and ``covariance``
+        support complex data; ``randomized`` does not and raises TypeError
+        for complex input.
     compute_modes: bool, (default True)
         Whether to eagerly compute the POD spatial modes. If False,
         `modes` is returned as a lazy Dask collection until

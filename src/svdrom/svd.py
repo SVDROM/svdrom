@@ -43,7 +43,9 @@ class TruncatedSVD(DecompositionModel):
             in both dimensions. 'tsqr' is more precise, but it is slower
             and struggles to operate on very large arrays. 'randomized' is
             less precise but is much faster and can more easily operate on
-            very large arrays. See the Notes section for more.
+            very large arrays. 'tsqr' supports complex data; 'randomized'
+            does not and raises TypeError for complex input. See the Notes
+            section for more.
         compute_u: bool, (default True)
             Whether to eagerly compute the left singular vectors, `u`. If
             set to False, the computational graph for `u` is built but not
@@ -159,6 +161,12 @@ class TruncatedSVD(DecompositionModel):
 
     def _check_array(self, X: xr.DataArray):
         """Checks if the input array is valid for SVD computation."""
+        if self._algorithm == "randomized" and X.dtype.kind == "c":
+            msg = (
+                "Randomized SVD does not support complex data. "
+                "Use 'tsqr' instead, or 'covariance' for POD."
+            )
+            raise TypeError(msg)
         if X.ndim != 2:
             msg = (
                 "The input array must be 2-dimensional. "
