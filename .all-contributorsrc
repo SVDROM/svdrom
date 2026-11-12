@@ -78,6 +78,20 @@
         "ideas",
         "research"
       ]
+    },
+    {
+      "login": "maggiexchen",
+      "name": "Maggie Chen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/58011801?v=4",
+      "profile": "https://github.com/maggiexchen",
+      "contributions": [
+        "doc"
+      ]
     }
-  ]
+  ],
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "contributorsPerLine": 7
 }
