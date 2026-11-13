@@ -1,0 +1,69 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dependabot/fetch-metadata@v2
+        id: metadata
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v7
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        with:
+          python-version: "3.12"
+
+      - name: Check lock versions and enable auto-merge
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python -m pip install packaging
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import subprocess
+          import tomllib
+
+          from packaging.version import Version
+
+          def lock_versions(ref):
+              endpoint = f"repos/{os.environ['GH_REPO']}/contents/uv.lock?ref={ref}"
+              response = subprocess.check_output(["gh", "api", endpoint], text=True)
+              lock = tomllib.loads(base64.b64decode(json.loads(response)["content"]).decode())
+              versions = {}
+              for package in lock["package"]:
+                  versions.setdefault(package["name"], set()).add(Version(package["version"]))
+              return versions
+
+          base = lock_versions(os.environ["BASE_SHA"])
+          head = lock_versions(os.environ["HEAD_SHA"])
+          downgrades = []
+          for name in sorted(base.keys() & head.keys()):
+              for version in sorted(head[name] - base[name]):
+                  if version < max(base[name]):
+                      downgrades.append(f"- {name}: {', '.join(map(str, sorted(base[name])))} → {version}")
+              for version in sorted(base[name] - head[name]):
+                  if version > max(head[name]):
+                      downgrades.append(f"- {name}: {version} → {', '.join(map(str, sorted(head[name])))}")
+          if downgrades:
+              body = "Manual review required: uv.lock contains potential downgrades:\n\n" + "\n".join(downgrades)
+              subprocess.run(["gh", "pr", "comment", os.environ["PR_URL"], "--body", body], check=True)
+          else:
+              subprocess.run(["gh", "pr", "review", os.environ["PR_URL"], "--approve"], check=True)
+              subprocess.run(["gh", "pr", "merge", os.environ["PR_URL"], "--auto", "--squash", "--match-head-commit", os.environ["HEAD_SHA"]], check=True)
+          PY
