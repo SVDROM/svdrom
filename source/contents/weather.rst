@@ -83,12 +83,12 @@ The weather utilities module provides metrics and tools commonly used in weather
     :type climatology: xarray.DataArray
     :param year: The year used to construct the new time dimension.
     :type year: int
-    :returns: The climatology with the ``dayofyear`` and ``hour`` dimensions converted into a single ``time`` dimension. The output DataArray is NumPy-backed.
+    :returns: The climatology with the ``dayofyear`` and ``hour`` dimensions converted into a single ``time`` dimension. The output is Dask-backed if the input is Dask-backed, and NumPy-backed otherwise.
     :rtype: xarray.DataArray
 
     .. rubric:: Notes
 
-    If the input DataArray is Dask-backed, the function will trigger the computation of the underlying task graph and load the data into memory.
+    This function preserves laziness for Dask-backed input. Call ``.compute()`` on the result if an in-memory array is needed.
 
     .. rubric:: Examples
 
