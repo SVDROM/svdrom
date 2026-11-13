@@ -65,6 +65,5 @@ jobs:
               body = "Manual review required: uv.lock contains potential downgrades:\n\n" + "\n".join(downgrades)
               subprocess.run(["gh", "pr", "comment", os.environ["PR_URL"], "--body", body], check=True)
           else:
-              subprocess.run(["gh", "pr", "review", os.environ["PR_URL"], "--approve"], check=True)
               subprocess.run(["gh", "pr", "merge", os.environ["PR_URL"], "--auto", "--squash", "--match-head-commit", os.environ["HEAD_SHA"]], check=True)
           PY
