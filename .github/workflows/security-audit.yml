@@ -16,14 +16,122 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v7
 
       - name: Audit locked dependencies
-        # apache-beam (weather extra, via weatherbench2) caps cryptography <49;
-        # drop these ignores once it allows cryptography>=50.
-        run: >-
-          uv audit --locked --preview-features audit-command
-          --ignore PYSEC-2026-3554 --ignore GHSA-m2h6-j472-rp4c
-          --ignore PYSEC-2026-3553 --ignore GHSA-jwv3-5hgf-82ww
-          --ignore PYSEC-2026-3552 --ignore GHSA-g6cj-pr64-35w5
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          audit=(uv audit --locked --preview-features audit-command,json-output --output-format json)
+          # apache-beam (weather extra via weatherbench2) caps cryptography<49.
+          # Drop once apache-beam permits cryptography>=50.
+          audit+=(
+            --ignore GHSA-m2h6-j472-rp4c
+            --ignore GHSA-jwv3-5hgf-82ww
+            --ignore GHSA-g6cj-pr64-35w5
+          )
+          # apache-beam caps pillow<13. Drop once it permits pillow>=13.
+          audit+=(
+            --ignore GHSA-22hg-r758-rrw9
+            --ignore GHSA-24rc-8hj2-v98c
+            --ignore GHSA-254f-3936-288h
+            --ignore GHSA-332p-7hrc-92wf
+            --ignore GHSA-462x-pgg6-55fp
+            --ignore GHSA-5xm2-6676-qcp9
+            --ignore GHSA-65qm-jvmh-6pqg
+            --ignore GHSA-74r2-7ff9-mjj2
+            --ignore GHSA-78g4-xqwv-q3g8
+            --ignore GHSA-c6hw-5grf-ff96
+            --ignore GHSA-f2g6-542v-9j58
+            --ignore GHSA-fc9g-5qg7-mf45
+            --ignore GHSA-g7cr-3p24-7wf7
+            --ignore GHSA-gg2r-wvfm-q9rx
+            --ignore GHSA-j4m9-6w36-pw47
+            --ignore GHSA-jg86-v3jv-hrpm
+            --ignore GHSA-mrfp-p49p-3hf2
+            --ignore GHSA-p4wg-p73j-c528
+            --ignore GHSA-q45j-58j2-45rg
+            --ignore GHSA-rfgq-q3w2-pmv2
+            --ignore GHSA-vx6w-vv9f-6gvg
+            --ignore GHSA-w889-685w-c8fh
+            --ignore GHSA-wqgw-9xfh-qf2g
+            --ignore GHSA-xcvg-w56q-r89m
+            --ignore GHSA-27h8-gf7j-v5hc
+            --ignore GHSA-4558-3h8r-v8xp
+            --ignore GHSA-4rr5-89j8-mwwm
+            --ignore GHSA-58r4-6rv3-gfh8
+            --ignore GHSA-5x8w-8jj5-q52h
+            --ignore GHSA-7mwm-ghpf-9vrm
+            --ignore GHSA-8g5g-8vmr-9782
+            --ignore GHSA-cp9v-662q-vvx9
+            --ignore GHSA-pchr-8j38-3x4p
+            --ignore GHSA-xgh8-jp6q-p5x8
+            --ignore GHSA-654x-cwwv-5j9c
+            --ignore GHSA-p8hx-v2p6-rp84
+            --ignore GHSA-g842-9rc4-69pw
+            --ignore GHSA-v9pv-5gc8-w2m6
+            --ignore GHSA-4rm8-3hmm-39fg
+            --ignore GHSA-3j72-p6qg-6xp7
+            --ignore GHSA-g4qv-2jxx-769h
+            --ignore GHSA-9v9v-9qvf-h2hj
+            --ignore GHSA-xvh5-g6gv-559v
+          )
+          # Fixed filelock>=4.2.1, dnspython>=2.9, tornado>=6.6 need Python>=3.11;
+          # soupsieve>=4 needs Python>=3.11.5. The Python 3.10 lock split is affected.
+          # Drop when upstream backports fixes or we drop Python 3.10 support.
+          audit+=(
+            --ignore GHSA-45c3-73f7-pv4m
+            --ignore GHSA-2g95-wg33-c5x2
+            --ignore GHSA-567q-5qvw-pf92
+            --ignore GHSA-6627-m3xw-93mp
+            --ignore GHSA-69hj-f68j-2879
+            --ignore GHSA-8mx5-7m5m-r77g
+            --ignore GHSA-9c4x-gm8v-wgc4
+            --ignore GHSA-9j6q-wvj5-jgjg
+            --ignore GHSA-9vhv-jxww-xfm5
+            --ignore GHSA-crv4-6mhj-j5jh
+            --ignore GHSA-cwqr-hh33-gh44
+            --ignore GHSA-fj95-fr6c-h845
+            --ignore GHSA-fq56-3cx3-fjxp
+            --ignore GHSA-jqc4-5cvw-7w85
+            --ignore GHSA-m462-7rxw-wvpg
+            --ignore GHSA-rfpc-qcw5-3pc4
+            --ignore GHSA-v4x8-3wr5-3wq8
+            --ignore GHSA-wfhq-q4j2-c37m
+            --ignore GHSA-mmhr-3c5m-f64f
+            --ignore GHSA-pcg2-g6cj-q92c
+            --ignore GHSA-pw9p-v7r6-gx4p
+            --ignore GHSA-r4j5-9xpp-3985
+          )
+          if [[ "$EVENT_NAME" != pull_request ]]; then
+            "${audit[@]}"
+            exit 0
+          fi
+
+          base_dir="$RUNNER_TEMP/audit-base"
+          git worktree add --detach "$base_dir" "$BASE_SHA"
+          trap 'git worktree remove --force "$base_dir"' EXIT
+          head_status=0
+          "${audit[@]}" > "$RUNNER_TEMP/audit-head.json" || head_status=$?
+          base_status=0
+          (cd "$base_dir" && "${audit[@]}") > "$RUNNER_TEMP/audit-base.json" || base_status=$?
+          # Exit 1 means advisories; infrastructure/lock errors must still fail.
+          if (( head_status > 1 || base_status > 1 )); then
+            exit 2
+          fi
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          reports = Path(os.environ["RUNNER_TEMP"])
+          head = {v["id"] for v in json.loads((reports / "audit-head.json").read_text())["vulnerabilities"]}
+          base = {v["id"] for v in json.loads((reports / "audit-base.json").read_text())["vulnerabilities"]}
+          print("New advisory IDs:", ", ".join(sorted(head - base)) or "none")
+          print("Pre-existing advisory IDs:", ", ".join(sorted(head & base)) or "none")
+          raise SystemExit(bool(head - base))
+          PY
