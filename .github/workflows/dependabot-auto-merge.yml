@@ -61,6 +61,7 @@ jobs:
                   if version > max(head[name]):
                       downgrades.append(f"- {name}: {version} → {', '.join(map(str, sorted(head[name])))}")
           if downgrades:
+              subprocess.run(["gh", "pr", "merge", "--disable-auto", os.environ["PR_URL"]], check=False)
               body = "Manual review required: uv.lock contains potential downgrades:\n\n" + "\n".join(downgrades)
               subprocess.run(["gh", "pr", "comment", os.environ["PR_URL"], "--body", body], check=True)
           else:
