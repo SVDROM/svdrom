@@ -1,0 +1,82 @@
+name: Paper
+
+# The joss-paper branch is a long-lived branch ahead of main that holds only
+# paper-related commits; it is never merged. Whenever the paper source changes
+# there, rebuild paper.pdf and commit it back, so the tracked PDF co-authors
+# review on GitHub always matches the source it was built from.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - joss-paper
+    paths:
+      - paper.md
+      - paper.bib
+
+# Serialise runs so two quick pushes can't race to commit paper.pdf.
+concurrency:
+  group: paper-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  draft:
+    name: Build JOSS draft PDF
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to commit the rebuilt paper.pdf
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the branch itself, not the detached commit, so we can push back.
+          ref: ${{ github.ref_name }}
+
+      - name: Build PDF with Open Journals' inara
+        shell: bash
+        run: |
+          set -eo pipefail
+          docker run --rm \
+            --volume "$PWD:/data" \
+            --user "$(id -u):$(id -g)" \
+            --env JOURNAL=joss \
+            openjournals/inara 2>&1 | tee build.log
+
+      # Uploaded before the glyph check, so a PDF that trips the check is still
+      # downloadable from the run page for inspection.
+      - name: Upload draft PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-draft-pdf
+          path: paper.pdf
+          if-no-files-found: error
+
+      # A glyph with no coverage in the JOSS font is dropped from the PDF
+      # silently: `\mathbf{\Sigma}` maps to U+1D6F4, which NewComputerModern
+      # lacks, so every Sigma vanished from the typeset maths while the
+      # Markdown still looked correct. Use `\boldsymbol{...}` for Greek.
+      - name: Fail on dropped glyphs
+        shell: bash
+        run: |
+          if grep -q 'Missing character' build.log; then
+            echo "::error file=paper.md::Characters were dropped from the typeset PDF"
+            grep 'Missing character' build.log | sort -u
+            exit 1
+          fi
+          echo "No missing characters - all glyphs rendered."
+
+      # Does not loop: this commit touches only paper.pdf, which is not in the
+      # `paths` filter above. --porcelain rather than `git diff`, so a paper.pdf
+      # missing from the repo entirely (untracked) still gets added.
+      - name: Commit rebuilt PDF
+        shell: bash
+        run: |
+          if [ -z "$(git status --porcelain -- paper.pdf)" ]; then
+            echo "paper.pdf is already up to date; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add paper.pdf
+          git commit -m "docs: rebuild paper.pdf from ${GITHUB_SHA:0:7}"
+          git push
