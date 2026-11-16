@@ -83,7 +83,7 @@ jobs:
           # Fixed filelock>=4.2.1, dnspython>=2.9, tornado>=6.6 need Python>=3.11;
           # soupsieve>=3.0.2 needs Python>=3.11.5. The Python 3.10 (and, for
           # soupsieve, Python 3.11.0-3.11.4) lock splits are affected.
-          # Drop when upstream backports fixes or we drop Python 3.10 support.
+          # Drop when upstream backports fixes or we drop Python<3.11.5 support.
           audit+=(
             --ignore GHSA-45c3-73f7-pv4m
             --ignore GHSA-2g95-wg33-c5x2
