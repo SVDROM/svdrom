@@ -81,7 +81,8 @@ jobs:
             --ignore GHSA-xvh5-g6gv-559v
           )
           # Fixed filelock>=4.2.1, dnspython>=2.9, tornado>=6.6 need Python>=3.11;
-          # soupsieve>=4 needs Python>=3.11.5. The Python 3.10 lock split is affected.
+          # soupsieve>=3.0.2 needs Python>=3.11.5. The Python 3.10 (and, for
+          # soupsieve, Python 3.11.0-3.11.4) lock splits are affected.
           # Drop when upstream backports fixes or we drop Python 3.10 support.
           audit+=(
             --ignore GHSA-45c3-73f7-pv4m
@@ -106,6 +107,10 @@ jobs:
             --ignore GHSA-pcg2-g6cj-q92c
             --ignore GHSA-pw9p-v7r6-gx4p
             --ignore GHSA-r4j5-9xpp-3985
+            --ignore GHSA-vvf4-9x63-8xvv
+            --ignore GHSA-7g44-g9rc-x53w
+            --ignore GHSA-6655-6qjp-jx7x
+            --ignore GHSA-5cjw-f85j-cv6r
           )
           if [[ "$EVENT_NAME" != pull_request ]]; then
             "${audit[@]}"
