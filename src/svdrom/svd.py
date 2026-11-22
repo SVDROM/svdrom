@@ -7,6 +7,7 @@ import xarray as xr
 from dask.utils import parse_bytes
 
 import svdrom.config as config
+from svdrom._backend import to_device, to_host
 from svdrom.logger import setup_logger
 from svdrom.svdrom_base import DecompositionModel
 
@@ -290,6 +291,10 @@ class TruncatedSVD(DecompositionModel):
             Additional keyword arguments to pass to the
             randomized SVD algorithm. See
             `dask.array.linalg.svd_compressed` for more details.
+            On the CuPy backend, ``compute=True`` is the default: Dask
+            recomputes input between passes to reduce device memory retention.
+            Pass ``compute=False`` to reuse the input graph when it fits in
+            memory. This option does not change the output laziness flags.
         """
         if self._algorithm not in ["tsqr", "randomized"]:
             msg = (
@@ -300,7 +305,7 @@ class TruncatedSVD(DecompositionModel):
             raise ValueError(msg)
 
         self._check_array(X)
-        X_da = X.data
+        X_da = to_device(X.data)
 
         if self._algorithm == "tsqr":
             msg = "Will use TSQR algorithm."
@@ -314,9 +319,16 @@ class TruncatedSVD(DecompositionModel):
             msg = "Will use randomized algorithm."
             logger.info(msg)
             X_da = self._rechunk_array(X_da) if self._rechunk else X_da
+            if config.get("array_backend") == "cupy":
+                kwargs.setdefault("compute", True)
             u, s, v = da.linalg.svd_compressed(X_da, self._n_components, **kwargs)
 
         explained_var_ratio = self._compute_explained_var_ratio(X_da, u, s)
+
+        # Download each final block before Dask gathers it, including deferred
+        # results. Internal decomposition tasks continue to execute on the GPU.
+        u, s, v = to_host(u), to_host(s), to_host(v)
+        explained_var_ratio = to_host(explained_var_ratio)
 
         results = []
         results.append(s)
@@ -409,12 +421,12 @@ class TruncatedSVD(DecompositionModel):
             )
             logger.error(msg)
             raise ValueError(msg)
-        X_da = X.data
+        X_da = to_device(X.data)
         try:
             msg = "Computing transformation..."
             logger.info(msg)
-            X_da_transformed = X_da.dot(self._v.data.T)
-            X_da_transformed = X_da_transformed.compute()
+            X_da_transformed = X_da.dot(to_device(self._v.data).T)
+            X_da_transformed = to_host(X_da_transformed).compute()
             msg = "Done."
             logger.info(msg)
         except ValueError as e:
