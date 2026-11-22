@@ -10,6 +10,7 @@ from dask.array.lib.stride_tricks import sliding_window_view as sliding_window_v
 from numpy.lib.stride_tricks import sliding_window_view as sliding_window_view_np
 
 import svdrom.config as config
+from svdrom._backend import to_device, to_host
 from svdrom.logger import setup_logger
 
 logger = setup_logger("Preprocessing", "preprocessing.log")
@@ -105,7 +106,7 @@ class StandardScaler:
         X: xr.Dataset | xr.DataArray,
         dim: str = "time",
         with_std: bool = False,
-    ):
+    ) -> xr.Dataset | xr.DataArray:
         """Scales the input xarray Dataset or DataArray by removing
         the mean and optionally dividing by the standard deviation.
 
@@ -128,22 +129,33 @@ class StandardScaler:
         xarray objects. The returned xarray object is Dask-backed and lazy if the input
         is Dask-backed.
         """
+        return to_host(self._scale(X, dim=dim, with_std=with_std))
+
+    def _scale(
+        self,
+        X: xr.Dataset | xr.DataArray,
+        dim: str = "time",
+        with_std: bool = False,
+    ) -> xr.Dataset | xr.DataArray:
+        """Scale on the selected backend, keeping private POD intermediates there."""
+        X = to_device(X)
         self._with_std = with_std
+        self._std = None
         self._mean = X.mean(dim=dim)
         msg = f"Computing mean along dimension {dim}..."
         logger.info(msg)
-        self._mean = self._mean.compute()
+        self._mean = to_host(self._mean).compute()
         msg = "Finished computing mean."
         logger.info(msg)
         if self._with_std:
             self._std = X.std(dim=dim)
             msg = f"Computing std along dimension {dim}..."
             logger.info(msg)
-            self._std = self._std.compute()
+            self._std = to_host(self._std).compute()
             msg = "Finished computing std."
             logger.info(msg)
-            return (X - self._mean) / self._std
-        return X - self._mean
+            return (X - to_device(self._mean)) / to_device(self._std)
+        return X - to_device(self._mean)
 
 
 def hankel_preprocessing(X: xr.DataArray, d: int = 2) -> xr.DataArray:
