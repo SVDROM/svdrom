@@ -148,6 +148,7 @@ class StandardScaler:
                 msg = "Finished computing std."
                 logger.info(msg)
             return (X - self._mean) / self._std
+        self._std = None
         return X - self._mean
 
 

@@ -133,6 +133,17 @@ def test_standard_scaler_lazy(as_dataset: bool, with_std: bool) -> None:
     xr.testing.assert_allclose(scaled.compute(), reference)
 
 
+def test_standard_scaler_clears_lazy_std_when_reused() -> None:
+    """Mean-only scaling releases the previous lazy standard deviation."""
+    data = xr.DataArray(da.arange(8, chunks=4), dims="time")
+    scaler = StandardScaler()
+    scaler(data, with_std=True, compute=False)
+    assert dask.is_dask_collection(scaler.std), "Expected the first std to be lazy."
+
+    scaler(data + 1, compute=False)
+    assert scaler.std is None, "Mean-only scaling must not retain the previous std."
+
+
 @pytest.mark.parametrize("generator", [data_generator, signal_generator])
 @pytest.mark.parametrize("d", [2, 3])
 def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int):
