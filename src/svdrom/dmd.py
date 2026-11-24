@@ -779,7 +779,7 @@ class OptDMD(DecompositionModel):
 
         if use_dask:
             # use Dask to compute the prediction
-            modes_da = da.from_array(self._modes, chunks=(-1, -1))
+            modes_da = da.from_array(self._modes.data, chunks=(-1, -1))
             time_da = self._rechunk_along_columns(
                 da.from_array(t[None, :], chunks=(1, "auto"))
             )
