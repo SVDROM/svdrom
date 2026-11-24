@@ -114,9 +114,9 @@ Notes:
 
 # Dependency and security maintenance
 
-Dependencies are kept current and free of known vulnerabilities by three pieces that work together.
+The Bot opens weekly dependency-bump PRs instead of Dependabot version updates. Three pieces handle known vulnerabilities:
 
-1. **Dependabot** (`.github/dependabot.yml`) opens PRs every Monday at 05:00 UTC that bump outdated `uv` dependencies and GitHub Actions, whether or not they are vulnerable. Minor and patch version bumps are grouped, and Python security updates arrive in one grouped PR. Non-major Dependabot PRs are enabled for squash auto-merge by `.github/workflows/dependabot-auto-merge.yml`, gated on a comparison of every package version in the base and head `uv.lock`. A maintainer approves each PR manually; it then merges automatically once required checks pass. Actions does not approve PRs, so the "Allow GitHub Actions to create and approve pull requests" setting is not needed. Potential downgrades disable auto-merge and are listed in a PR comment instead; majors and downgrades stay manual. Major `cryptography` bumps are ignored: `apache-beam` (pulled in by the `weather` extra via `weatherbench2`) caps it, and resolving a major bump downgrades `apache-beam` and `pyarrow` and brings back known vulnerabilities.
+1. **Dependabot** is a security backstop. Keep the dependency graph, Dependabot alerts, Dependabot security updates, and grouped security updates enabled in the repository's security settings. No `.github/dependabot.yml` is needed; the grouping setting combines eligible security fixes per package ecosystem. `.github/workflows/dependabot-auto-merge.yml` only handles PRs opened by Dependabot that have its security-update footer. It compares every package version in the base and head `uv.lock` and does not enable squash auto-merge for updates marked as major. Potential downgrades and major `cryptography` bumps found in the lock disable auto-merge and are flagged in a PR comment. Review major `cryptography` bumps manually: `apache-beam` (pulled in by the `weather` extra via `weatherbench2`) caps it, and resolving a major bump can downgrade `apache-beam` and `pyarrow` and bring back known vulnerabilities (see #97). A maintainer still approves each PR manually; it then merges automatically once required checks pass. Actions does not approve PRs, so the "Allow GitHub Actions to create and approve pull requests" setting is not needed.
 2. **Security audit** (`.github/workflows/security-audit.yml`) runs `uv audit` against `uv.lock` every Monday at 07:23 UTC (off the hour, since GitHub may drop scheduled runs at the start of busy hours), on manual dispatch, and on PRs that change `uv.lock`, `pyproject.toml` or the workflow itself. PR checks fail only on newly introduced advisory IDs, comparing head and base locks with the same ignore list and printing new and pre-existing IDs. Scheduled and manual audits on `main` remain strict full audits. Advisories that can't be fixed yet because of an upstream cap or Python compatibility are skipped with commented `--ignore` flags explaining when to remove them.
 3. **Devin Automation** ("Remediate failed uv audit on SVDROM/svdrom main") starts a [Devin](https://devin.ai) session when the audit job fails on `main`. Failures on PR branches don't trigger it. The session:
    - handles only what Dependabot can't: capped or unresolvable advisories and ignores, skipping advisories already covered by an open PR;
@@ -127,8 +127,6 @@ Dependencies are kept current and free of known vulnerabilities by three pieces 
    - runs the tests, pre-commit and the audit, then opens or updates the rolling PR for review.
 
    It never merges, runs at most twice a week, and posts its final report to Slack, including when it can't open a PR.
-
-Dependabot runs two hours before the audit so that its PR already exists and the automation doesn't duplicate it.
 
 When reviewing dependency PRs, check the `uv.lock` diff for downgrades, not just the CI result. If you change the remediation rules above, update the automation's prompt to match.
 
