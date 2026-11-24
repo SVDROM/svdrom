@@ -9,7 +9,9 @@ permissions:
 
 jobs:
   auto-merge:
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      contains(github.event.pull_request.body, format('You can disable automated security fix PRs for this repo from the [Security Alerts page]({0}/{1}/network/alerts).', github.server_url, github.repository))
     runs-on: ubuntu-latest
     steps:
       - uses: dependabot/fetch-metadata@v2
@@ -18,18 +20,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@v7
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         with:
           python-version: "3.12"
 
       - name: Check lock versions and enable auto-merge
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
         run: |
           python -m pip install packaging
           python - <<'PY'
@@ -60,10 +61,19 @@ jobs:
               for version in sorted(base[name] - head[name]):
                   if version > max(head[name]):
                       downgrades.append(f"- {name}: {version} → {', '.join(map(str, sorted(head[name])))}")
+          review_reasons = []
+          base_crypto_majors = {version.major for version in base.get("cryptography", ())}
+          head_crypto_majors = {version.major for version in head.get("cryptography", ())}
+          if base_crypto_majors and any(
+              major > min(base_crypto_majors) for major in head_crypto_majors - base_crypto_majors
+          ):
+              review_reasons.append("cryptography has a major-version bump; check the apache-beam cap (see #97).")
           if downgrades:
+              review_reasons.append("uv.lock contains potential downgrades:\n\n" + "\n".join(downgrades))
+          if review_reasons:
               subprocess.run(["gh", "pr", "merge", "--disable-auto", os.environ["PR_URL"]], check=False)
-              body = "Manual review required: uv.lock contains potential downgrades:\n\n" + "\n".join(downgrades)
+              body = "Manual review required: " + "\n\n".join(review_reasons)
               subprocess.run(["gh", "pr", "comment", os.environ["PR_URL"], "--body", body], check=True)
-          else:
+          elif os.environ["UPDATE_TYPE"] != "version-update:semver-major":
               subprocess.run(["gh", "pr", "merge", os.environ["PR_URL"], "--auto", "--squash", "--match-head-commit", os.environ["HEAD_SHA"]], check=True)
           PY
