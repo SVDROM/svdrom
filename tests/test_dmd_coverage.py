@@ -233,7 +233,10 @@ def test_forecast_does_not_build_eager_evolution(
     def reject_compute(*args: object, **kwargs: object) -> None:
         pytest.fail("Lazy DMD forecast must not execute Dask tasks.")
 
-    with monkeypatch.context() as patch, dask.config.set(scheduler=reject_compute):
+    with (
+        monkeypatch.context() as patch,
+        dask.config.set({"scheduler": reject_compute, "array.chunk-size": "16 KiB"}),
+    ):
         patch.setattr(np, "outer", reject_outer)
         result = solver.forecast("20 s", dt="2 s", memory_limit_bytes=0)
 
@@ -241,6 +244,7 @@ def test_forecast_does_not_build_eager_evolution(
     expected_arrays = expected if isinstance(expected, tuple) else (expected,)
     for actual, reference in zip(actual_arrays, expected_arrays, strict=True):
         assert isinstance(actual.data, da.Array), "Expected a Dask-backed forecast."
+        assert len(actual.chunksizes["time"]) > 1, "Expected multiple time chunks."
         xr.testing.assert_allclose(actual.compute(), reference)
 
 
