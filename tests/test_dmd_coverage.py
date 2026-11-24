@@ -11,7 +11,8 @@ import xarray as xr
 from make_test_data import DataGenerator
 
 import svdrom.config as config
-from svdrom import OptDMD
+from svdrom import OptDMD, TruncatedSVD
+from svdrom.preprocessing import hankel_preprocessing
 
 dask.config.set(scheduler="single-threaded")
 
@@ -308,6 +309,38 @@ def test_rechunk_unfitted():
 # ---------------------------------------------------------------------------
 # label-based reconstruction paths
 # ---------------------------------------------------------------------------
+
+
+def test_reconstruct_hankel_stays_lazy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Over-limit Hankel reconstruction extracts lags without evaluating data."""
+    generator = DataGenerator(seed=1234)
+    generator.generate_dataarray()
+    data = generator.da.stack(samples=("x", "y", "z")).transpose("samples", "time")
+    embedded = hankel_preprocessing(data, d=3).chunk()
+    svd = TruncatedSVD(n_components=6).fit(embedded)
+    solver = OptDMD().fit(svd.u, svd.s, svd.v, varpro_opts_dict={"maxiter": 15})
+    selection = slice(1, 12)
+    expected = solver.reconstruct(selection)
+
+    def reject_outer(*args: object, **kwargs: object) -> None:
+        pytest.fail("Reconstruction must not build an eager NumPy outer product.")
+
+    def reject_compute(*args: object, **kwargs: object) -> None:
+        pytest.fail("Lazy reconstruction must not execute Dask tasks.")
+
+    with (
+        monkeypatch.context() as patch,
+        dask.config.set({"scheduler": reject_compute, "array.chunk-size": "64 KiB"}),
+    ):
+        patch.setattr(np, "outer", reject_outer)
+        result = solver.reconstruct(selection, memory_limit_bytes=0)
+
+    assert isinstance(result, xr.DataArray), "Expected a deterministic reconstruction."
+    assert isinstance(result.data, da.Array), "Expected a Dask-backed reconstruction."
+    assert len(result.chunksizes["time"]) > 1, "Expected multiple time chunks."
+    assert result.sizes["samples"] == data.sizes["samples"], "Expected lags removed."
+    xr.testing.assert_identical(result["time"], data["time"].isel(time=selection))
+    xr.testing.assert_allclose(result.compute(), expected)
 
 
 def test_reconstruct_label_slice(fitted_optdmd):
