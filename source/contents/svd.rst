@@ -89,12 +89,14 @@ The SVD module provides access to the ``TruncatedSVD`` class, which provides an 
             When using the the ``"randomized"`` algorithm, increasing the number of power iterations (via ``n_power_iter``) and the number of oversamples (via ``n_oversamples``) can significantly improve accuracy, at the expense of additional but manageable computational cost.
             See the SVD demo notebooks in the ``demos`` folder for an example.
 
-    .. py:method:: transform(X)
+    .. py:method:: transform(X, compute=True)
 
         Project an input array onto the fitted right singular vectors, computing :math:`\tilde{\mathbf{X}} = \mathbf{X}\, \mathbf{V}_k^{*\top}`. The input must have the same number of features as the array on which the model was fitted. The returned ``DataArray`` replaces the feature dimension with the ``"components"`` axis.
 
         :param X: Array to project with shape ``(n_samples, n_features)``. Must be a Dask-backed ``xarray.DataArray``.
         :type X: xarray.DataArray
+        :param compute: If ``True``, compute the projection eagerly. If ``False``, keep the projection lazy for Dask-backed input. Default is ``True``.
+        :type compute: bool
         :returns: The projected array with shape ``(n_samples, n_components)``.
         :rtype: xarray.DataArray
 

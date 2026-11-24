@@ -3,6 +3,8 @@ of the OptDMD class, to raise coverage of the dmd module above 80%."""
 
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import dask
 import dask.array as da
 import numpy as np
@@ -11,7 +13,8 @@ import xarray as xr
 from make_test_data import DataGenerator
 
 import svdrom.config as config
-from svdrom import OptDMD
+from svdrom import OptDMD, TruncatedSVD
+from svdrom.preprocessing import hankel_preprocessing
 
 dask.config.set(scheduler="single-threaded")
 
@@ -217,6 +220,40 @@ def test_forecast_span_bad_string(fitted_optdmd):
         fitted_optdmd._generate_forecast_time_vector("10")
 
 
+@pytest.mark.parametrize("bagging", [False, True])
+def test_forecast_does_not_build_eager_evolution(
+    bagging: bool, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An over-limit forecast defers evolution in both forecasting modes."""
+    solver: OptDMD = request.getfixturevalue(
+        "fitted_optdmd_bagging" if bagging else "fitted_optdmd"
+    )
+    expected = solver.forecast("20 s", dt="2 s")
+
+    def reject_outer(*args: object, **kwargs: object) -> None:
+        pytest.fail("Forecast must not build a NumPy outer product before computing.")
+
+    def reject_compute(*args: object, **kwargs: object) -> None:
+        pytest.fail("Lazy DMD forecast must not execute Dask tasks.")
+
+    with (
+        monkeypatch.context() as patch,
+        dask.config.set({"scheduler": reject_compute, "array.chunk-size": "16 KiB"}),
+    ):
+        patch.setattr(np, "outer", reject_outer)
+        result = solver.forecast("20 s", dt="2 s", memory_limit_bytes=0)
+
+    actual_arrays = result if isinstance(result, tuple) else (result,)
+    expected_arrays = expected if isinstance(expected, tuple) else (expected,)
+    for actual, reference in zip(actual_arrays, expected_arrays, strict=True):
+        assert isinstance(actual.data, da.Array), "Expected a Dask-backed forecast."
+        assert len(actual.chunksizes["time"]) > 1, "Expected multiple time chunks."
+        try:
+            xr.testing.assert_allclose(actual.compute(), reference)
+        except AssertionError as error:
+            pytest.fail(f"Expected the lazy forecast to match the eager one.\n{error}")
+
+
 def test_forecast_dt_bad_string(fitted_optdmd):
     """A malformed dt string raises a ValueError."""
     with pytest.raises(ValueError, match="value units"):
@@ -277,6 +314,49 @@ def test_rechunk_unfitted():
 # ---------------------------------------------------------------------------
 # label-based reconstruction paths
 # ---------------------------------------------------------------------------
+
+
+def test_reconstruct_hankel_stays_lazy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Over-limit Hankel reconstruction extracts lags without evaluating data."""
+    generator = DataGenerator(seed=1234)
+    generator.generate_dataarray()
+    data = generator.da.stack(samples=("x", "y", "z")).transpose("samples", "time")
+    embedded = hankel_preprocessing(data, d=3).chunk()
+    svd = TruncatedSVD(n_components=6).fit(embedded)
+    solver = OptDMD().fit(svd.u, svd.s, svd.v, varpro_opts_dict={"maxiter": 15})
+    selection = slice(1, 12)
+    expected = solver.reconstruct(selection)
+
+    def reject_outer(*args: object, **kwargs: object) -> None:
+        pytest.fail("Reconstruction must not build an eager NumPy outer product.")
+
+    def reject_compute(*args: object, **kwargs: object) -> None:
+        pytest.fail("Lazy reconstruction must not execute Dask tasks.")
+
+    extract_hankel = Mock(wraps=solver._extract_hankel_prediction)
+    with (
+        monkeypatch.context() as patch,
+        dask.config.set({"scheduler": reject_compute, "array.chunk-size": "64 KiB"}),
+    ):
+        patch.setattr(np, "outer", reject_outer)
+        patch.setattr(solver, "_extract_hankel_prediction", extract_hankel)
+        result = solver.reconstruct(selection, memory_limit_bytes=0)
+
+    assert extract_hankel.call_count == 1, "Expected one Hankel lag extraction."
+    prediction = extract_hankel.call_args.args[0]
+    assert isinstance(prediction, da.Array), "Expected a lazy Hankel prediction."
+    assert prediction.numblocks[1] > 1, "Expected time chunks before lag extraction."
+    assert isinstance(result, xr.DataArray), "Expected a deterministic reconstruction."
+    assert isinstance(result.data, da.Array), "Expected a Dask-backed reconstruction."
+    assert len(result.chunksizes["time"]) > 1, "Expected multiple time chunks."
+    assert result.sizes["samples"] == data.sizes["samples"], "Expected lags removed."
+    assert result["time"].identical(
+        data["time"].isel(time=selection)
+    ), "Expected the requested original timestamps after lag extraction."
+    try:
+        xr.testing.assert_allclose(result.compute(), expected)
+    except AssertionError as error:
+        pytest.fail(f"Expected lazy and eager reconstructions to match.\n{error}")
 
 
 def test_reconstruct_label_slice(fitted_optdmd):

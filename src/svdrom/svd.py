@@ -193,7 +193,7 @@ class TruncatedSVD(DecompositionModel):
             raise TypeError(msg)
 
     def _singular_vectors_to_dataarray(
-        self, singular_vectors: np.ndarray, X: xr.DataArray, kind: str
+        self, singular_vectors: np.ndarray | da.Array, X: xr.DataArray, kind: str
     ) -> xr.DataArray:
         """Transform the singular vectors into a Xarray DataArray following
         the dimensions and coordinates of the DataArray on which SVD was
@@ -201,7 +201,7 @@ class TruncatedSVD(DecompositionModel):
 
         Parameters
         ----------
-        singular_vectors: np.ndarray
+        singular_vectors: np.ndarray | da.Array
             The singular vectors to transform into a DataArray.
         X: xr.DataArray
             The DataArray on which SVD was performed.
@@ -388,7 +388,7 @@ class TruncatedSVD(DecompositionModel):
         msg = "Done."
         logger.info(msg)
 
-    def transform(self, X: xr.DataArray) -> xr.DataArray:
+    def transform(self, X: xr.DataArray, compute: bool = True) -> xr.DataArray:
         """Transform the input array using the computed right singular vectors.
 
         Parameters
@@ -396,6 +396,9 @@ class TruncatedSVD(DecompositionModel):
         X: (xarray.DataArray), shape (n_samples, n_features)
             the array to be transformed, which must have the same
             number of features as the original array on which SVD was fitted.
+        compute: bool, default True
+            If True, compute the projection eagerly. If False, keep the
+            projection lazy for Dask-backed input.
 
         Returns
         -------
@@ -414,7 +417,8 @@ class TruncatedSVD(DecompositionModel):
             msg = "Computing transformation..."
             logger.info(msg)
             X_da_transformed = X_da.dot(self._v.data.T)
-            X_da_transformed = X_da_transformed.compute()
+            if compute and isinstance(X_da_transformed, da.Array):
+                X_da_transformed = X_da_transformed.compute()
             msg = "Done."
             logger.info(msg)
         except ValueError as e:

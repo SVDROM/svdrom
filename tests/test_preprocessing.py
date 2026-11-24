@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dask
+import dask.array as da
 import numpy as np
 import pytest
 import xarray as xr
@@ -105,6 +107,44 @@ def test_standard_scaler(X: xr.DataArray | xr.Dataset):
             xr.testing.assert_allclose(X, X_scaled * scaler.std + scaler.mean)
         else:
             xr.testing.assert_allclose(X, X_scaled + scaler.mean)
+
+
+@pytest.mark.parametrize("as_dataset", [False, True])
+@pytest.mark.parametrize("with_std", [False, True])
+def test_standard_scaler_lazy(as_dataset: bool, with_std: bool) -> None:
+    """Lazy scaling does not execute tasks to compute its statistics."""
+    data = xr.DataArray(
+        da.arange(12, chunks=4).reshape(4, 3), dims=("time", "space"), name="signal"
+    )
+    X = data.to_dataset() if as_dataset else data
+    reference = StandardScaler()(X.compute(), with_std=with_std)
+    scaler = StandardScaler()
+
+    def reject_compute(*args: object, **kwargs: object) -> None:
+        pytest.fail("Lazy standard scaling must not execute Dask tasks.")
+
+    with dask.config.set(scheduler=reject_compute):
+        scaled = scaler(X, with_std=with_std, compute=False)
+
+    assert dask.is_dask_collection(scaled), "Expected Dask-backed scaled data."
+    assert dask.is_dask_collection(scaler.mean), "Expected a Dask-backed mean."
+    if with_std:
+        assert dask.is_dask_collection(scaler.std), "Expected a Dask-backed deviation."
+    try:
+        xr.testing.assert_allclose(scaled.compute(), reference)
+    except AssertionError as error:
+        pytest.fail(f"Expected lazy scaling to match eager scaling.\n{error}")
+
+
+def test_standard_scaler_clears_lazy_std_when_reused() -> None:
+    """Mean-only scaling releases the previous lazy standard deviation."""
+    data = xr.DataArray(da.arange(8, chunks=4), dims="time")
+    scaler = StandardScaler()
+    scaler(data, with_std=True, compute=False)
+    assert dask.is_dask_collection(scaler.std), "Expected the first std to be lazy."
+
+    scaler(data + 1, compute=False)
+    assert scaler.std is None, "Mean-only scaling must not retain the previous std."
 
 
 @pytest.mark.parametrize("generator", [data_generator, signal_generator])
