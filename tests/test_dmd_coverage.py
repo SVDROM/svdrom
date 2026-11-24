@@ -3,6 +3,8 @@ of the OptDMD class, to raise coverage of the dmd module above 80%."""
 
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import dask
 import dask.array as da
 import numpy as np
@@ -328,13 +330,19 @@ def test_reconstruct_hankel_stays_lazy(monkeypatch: pytest.MonkeyPatch) -> None:
     def reject_compute(*args: object, **kwargs: object) -> None:
         pytest.fail("Lazy reconstruction must not execute Dask tasks.")
 
+    extract_hankel = Mock(wraps=solver._extract_hankel_prediction)
     with (
         monkeypatch.context() as patch,
         dask.config.set({"scheduler": reject_compute, "array.chunk-size": "64 KiB"}),
     ):
         patch.setattr(np, "outer", reject_outer)
+        patch.setattr(solver, "_extract_hankel_prediction", extract_hankel)
         result = solver.reconstruct(selection, memory_limit_bytes=0)
 
+    extract_hankel.assert_called_once()
+    prediction = extract_hankel.call_args.args[0]
+    assert isinstance(prediction, da.Array), "Expected a lazy Hankel prediction."
+    assert prediction.numblocks[1] > 1, "Expected time chunks before lag extraction."
     assert isinstance(result, xr.DataArray), "Expected a deterministic reconstruction."
     assert isinstance(result.data, da.Array), "Expected a Dask-backed reconstruction."
     assert len(result.chunksizes["time"]) > 1, "Expected multiple time chunks."
