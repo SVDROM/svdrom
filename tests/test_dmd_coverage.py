@@ -248,7 +248,10 @@ def test_forecast_does_not_build_eager_evolution(
     for actual, reference in zip(actual_arrays, expected_arrays, strict=True):
         assert isinstance(actual.data, da.Array), "Expected a Dask-backed forecast."
         assert len(actual.chunksizes["time"]) > 1, "Expected multiple time chunks."
-        xr.testing.assert_allclose(actual.compute(), reference)
+        try:
+            xr.testing.assert_allclose(actual.compute(), reference)
+        except AssertionError as error:
+            pytest.fail(f"Expected the lazy forecast to match the eager one.\n{error}")
 
 
 def test_forecast_dt_bad_string(fitted_optdmd):
@@ -339,7 +342,7 @@ def test_reconstruct_hankel_stays_lazy(monkeypatch: pytest.MonkeyPatch) -> None:
         patch.setattr(solver, "_extract_hankel_prediction", extract_hankel)
         result = solver.reconstruct(selection, memory_limit_bytes=0)
 
-    extract_hankel.assert_called_once()
+    assert extract_hankel.call_count == 1, "Expected one Hankel lag extraction."
     prediction = extract_hankel.call_args.args[0]
     assert isinstance(prediction, da.Array), "Expected a lazy Hankel prediction."
     assert prediction.numblocks[1] > 1, "Expected time chunks before lag extraction."
@@ -347,8 +350,13 @@ def test_reconstruct_hankel_stays_lazy(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(result.data, da.Array), "Expected a Dask-backed reconstruction."
     assert len(result.chunksizes["time"]) > 1, "Expected multiple time chunks."
     assert result.sizes["samples"] == data.sizes["samples"], "Expected lags removed."
-    xr.testing.assert_identical(result["time"], data["time"].isel(time=selection))
-    xr.testing.assert_allclose(result.compute(), expected)
+    assert result["time"].identical(
+        data["time"].isel(time=selection)
+    ), "Expected the requested original timestamps after lag extraction."
+    try:
+        xr.testing.assert_allclose(result.compute(), expected)
+    except AssertionError as error:
+        pytest.fail(f"Expected lazy and eager reconstructions to match.\n{error}")
 
 
 def test_reconstruct_label_slice(fitted_optdmd):

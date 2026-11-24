@@ -281,7 +281,9 @@ def test_transform_lazy() -> None:
         projected = tsvd.transform(X, compute=False)
 
     assert isinstance(projected.data, da.Array), "Expected a Dask-backed projection."
-    xr.testing.assert_identical(projected.compute(), expected)
+    assert projected.compute().identical(
+        expected
+    ), "Expected the lazy projection to match the eager one."
 
 
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])

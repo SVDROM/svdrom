@@ -130,7 +130,10 @@ def test_standard_scaler_lazy(as_dataset: bool, with_std: bool) -> None:
     assert dask.is_dask_collection(scaler.mean), "Expected a Dask-backed mean."
     if with_std:
         assert dask.is_dask_collection(scaler.std), "Expected a Dask-backed deviation."
-    xr.testing.assert_allclose(scaled.compute(), reference)
+    try:
+        xr.testing.assert_allclose(scaled.compute(), reference)
+    except AssertionError as error:
+        pytest.fail(f"Expected lazy scaling to match eager scaling.\n{error}")
 
 
 def test_standard_scaler_clears_lazy_std_when_reused() -> None:
