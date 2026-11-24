@@ -50,7 +50,7 @@ The preprocessing module provides utilities for preparing data before SVD or DMD
 
         Whether the data has been scaled to unit variance (read-only).
 
-    .. py:method:: __call__(X, dim='time', with_std=False)
+    .. py:method:: __call__(X, dim='time', with_std=False, *, compute=True)
 
         Scale the input xarray object by removing the mean and optionally dividing by the standard deviation.
 
@@ -60,12 +60,14 @@ The preprocessing module provides utilities for preparing data before SVD or DMD
         :type dim: str
         :param with_std: If ``True``, scales the data by dividing by the standard deviation after subtracting the mean. Default is ``False``.
         :type with_std: bool
+        :param compute: If ``True``, compute and store the scaling statistics eagerly. If ``False``, keep them lazy for Dask-backed input. Default is ``True``.
+        :type compute: bool
         :returns: The scaled xarray object with the mean removed, and optionally divided by the standard deviation.
         :rtype: xarray.Dataset or xarray.DataArray
 
         .. rubric:: Notes
 
-        The mean and standard deviation are computed eagerly and stored as NumPy-backed xarray objects. The returned xarray object is Dask-backed and lazy if the input is Dask-backed.
+        The returned xarray object is Dask-backed and lazy if the input is Dask-backed, independently of whether the statistics are computed eagerly.
 
         .. rubric:: Examples
 

@@ -267,6 +267,23 @@ def test_transform(matrix_type):
     ), "Transformed data does not match u * s."
 
 
+def test_transform_lazy() -> None:
+    """The lazy projection builds a graph without executing Dask tasks."""
+    X = make_dataarray("tall-and-skinny")
+    tsvd = TruncatedSVD(n_components=3)
+    tsvd.fit(X)
+    expected = tsvd.transform(X)
+
+    def reject_compute(*args: object, **kwargs: object) -> None:
+        pytest.fail("Lazy SVD transform must not execute Dask tasks.")
+
+    with dask.config.set(scheduler=reject_compute):
+        projected = tsvd.transform(X, compute=False)
+
+    assert isinstance(projected.data, da.Array), "Expected a Dask-backed projection."
+    xr.testing.assert_identical(projected.compute(), expected)
+
+
 @pytest.mark.parametrize("matrix_type", ["tall-and-skinny", "short-and-fat"])
 def test_reconstruct(matrix_type):
     """Test the reconstruct method of TruncatedSVD."""

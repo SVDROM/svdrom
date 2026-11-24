@@ -780,6 +780,14 @@ class OptDMD(DecompositionModel):
         if use_dask:
             # use Dask to compute the prediction
             modes_da = da.from_array(self._modes, chunks=(-1, -1))
+            time_da = self._rechunk_along_columns(
+                da.from_array(t[None, :], chunks=(1, "auto"))
+            )
+
+            def evolution(eigs: np.ndarray) -> da.Array:
+                eigs_da = da.from_array(eigs[:, None], chunks=(-1, 1))
+                return da.exp(eigs_da * time_da)
+
             if self._eigs_std is not None and self._amplitudes_std is not None:
                 # when bagging has been used, use Monte-Carlo uncertainty propagation
                 # to produce multiple prediction realizations
@@ -787,10 +795,8 @@ class OptDMD(DecompositionModel):
                     # draw eigenvalues and amplitudes from random distribution
                     eigs, amps = draw_from_rand_distr(rng)
                     amps_da = da.from_array(np.diag(amps), chunks=(-1, -1))
-                    exp_da = da.from_array(np.exp(np.outer(eigs, t)))
-                    exp_da = self._rechunk_along_columns(exp_da)
                     # compute a prediction realization
-                    prediction_da = da.dot(modes_da, da.dot(amps_da, exp_da))
+                    prediction_da = da.dot(modes_da, da.dot(amps_da, evolution(eigs)))
                     predictions.append(prediction_da)
 
                 # stack predictions along new axis and compute mean and variance
@@ -801,11 +807,7 @@ class OptDMD(DecompositionModel):
                 np.diag(self._amplitudes),
                 chunks=(-1, -1),
             )
-            exp_da = da.from_array(
-                np.exp(np.outer(self._eigs, t)),
-            )
-            exp_da = self._rechunk_along_columns(exp_da)
-            return da.dot(modes_da, da.dot(amps_da, exp_da))
+            return da.dot(modes_da, da.dot(amps_da, evolution(self._eigs)))
 
         # use NumPy to compute the prediction
         if self._eigs_std is not None and self._amplitudes_std is not None:
@@ -960,10 +962,10 @@ class OptDMD(DecompositionModel):
             logger.exception(msg)
             raise RuntimeError(msg)
         array_shape = (self._modes.shape[0], len(t))
+        exponent_dtype = np.result_type(self._eigs.dtype, t.dtype)
+        evolution_dtype = np.exp(np.empty(0, dtype=exponent_dtype)).dtype
         dtype = np.result_type(
-            self._modes,
-            self._amplitudes,
-            np.exp(np.outer(self._eigs, t)),
+            self._modes.dtype, self._amplitudes.dtype, evolution_dtype
         )
         return (np.prod(array_shape) * np.dtype(dtype).itemsize).item()
 

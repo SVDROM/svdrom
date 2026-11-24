@@ -163,8 +163,9 @@ class POD(TruncatedSVD):
             X = X.T
         if self._remove_mean:
             scaler = StandardScaler()
-            X = scaler(X, dim=self._time_dim)
-            assert isinstance(X, xr.DataArray), "Expected DataArray after scaling."
+            scaled = scaler(X, dim=self._time_dim)
+            assert isinstance(scaled, xr.DataArray), "Expected DataArray after scaling."
+            X = scaled
             self._mean = scaler._mean
         n_snapshots = X.sizes[self._time_dim]
         self._scale_factor = n_snapshots**0.5

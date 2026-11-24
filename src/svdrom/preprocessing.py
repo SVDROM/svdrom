@@ -105,7 +105,9 @@ class StandardScaler:
         X: xr.Dataset | xr.DataArray,
         dim: str = "time",
         with_std: bool = False,
-    ):
+        *,
+        compute: bool = True,
+    ) -> xr.Dataset | xr.DataArray:
         """Scales the input xarray Dataset or DataArray by removing
         the mean and optionally dividing by the standard deviation.
 
@@ -116,6 +118,8 @@ class StandardScaler:
         standard deviation. Default is "time".
         with_std (bool): if True, scales the data by dividing by the standard
         deviation after subtracting the mean. Default is False.
+        compute (bool): if True, compute and store the scaling statistics eagerly.
+        If False, keep the statistics lazy for Dask-backed input. Default is True.
 
         Returns:
         --------
@@ -124,24 +128,25 @@ class StandardScaler:
 
         Note
         ----
-        The mean and standard deviation are computed eagerly and stored as NumPy-backed
-        xarray objects. The returned xarray object is Dask-backed and lazy if the input
-        is Dask-backed.
+        The returned xarray object is Dask-backed and lazy if the input is
+        Dask-backed, independently of whether the statistics are computed eagerly.
         """
         self._with_std = with_std
         self._mean = X.mean(dim=dim)
-        msg = f"Computing mean along dimension {dim}..."
-        logger.info(msg)
-        self._mean = self._mean.compute()
-        msg = "Finished computing mean."
-        logger.info(msg)
+        if compute:
+            msg = f"Computing mean along dimension {dim}..."
+            logger.info(msg)
+            self._mean = self._mean.compute()
+            msg = "Finished computing mean."
+            logger.info(msg)
         if self._with_std:
             self._std = X.std(dim=dim)
-            msg = f"Computing std along dimension {dim}..."
-            logger.info(msg)
-            self._std = self._std.compute()
-            msg = "Finished computing std."
-            logger.info(msg)
+            if compute:
+                msg = f"Computing std along dimension {dim}..."
+                logger.info(msg)
+                self._std = self._std.compute()
+                msg = "Finished computing std."
+                logger.info(msg)
             return (X - self._mean) / self._std
         return X - self._mean
 

@@ -217,6 +217,33 @@ def test_forecast_span_bad_string(fitted_optdmd):
         fitted_optdmd._generate_forecast_time_vector("10")
 
 
+@pytest.mark.parametrize("bagging", [False, True])
+def test_forecast_does_not_build_eager_evolution(
+    bagging: bool, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An over-limit forecast defers evolution in both forecasting modes."""
+    solver: OptDMD = request.getfixturevalue(
+        "fitted_optdmd_bagging" if bagging else "fitted_optdmd"
+    )
+    expected = solver.forecast("20 s", dt="2 s")
+
+    def reject_outer(*args: object, **kwargs: object) -> None:
+        pytest.fail("Forecast must not build a NumPy outer product before computing.")
+
+    def reject_compute(*args: object, **kwargs: object) -> None:
+        pytest.fail("Lazy DMD forecast must not execute Dask tasks.")
+
+    with monkeypatch.context() as patch, dask.config.set(scheduler=reject_compute):
+        patch.setattr(np, "outer", reject_outer)
+        result = solver.forecast("20 s", dt="2 s", memory_limit_bytes=0)
+
+    actual_arrays = result if isinstance(result, tuple) else (result,)
+    expected_arrays = expected if isinstance(expected, tuple) else (expected,)
+    for actual, reference in zip(actual_arrays, expected_arrays, strict=True):
+        assert isinstance(actual.data, da.Array), "Expected a Dask-backed forecast."
+        xr.testing.assert_allclose(actual.compute(), reference)
+
+
 def test_forecast_dt_bad_string(fitted_optdmd):
     """A malformed dt string raises a ValueError."""
     with pytest.raises(ValueError, match="value units"):
