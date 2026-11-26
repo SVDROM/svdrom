@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from types import ModuleType
 from typing import Any
 
@@ -37,20 +38,46 @@ def get_xp() -> ModuleType:
     return cupy
 
 
-def to_device(arr: Any) -> Any:
+def _convert_xarray(
+    arr: xr.DataArray | xr.Dataset, convert: Callable[[Any], Any]
+) -> xr.DataArray | xr.Dataset:
+    """Replace only data buffers, sharing coordinates and indexes."""
+    if isinstance(arr, xr.DataArray):
+        original = arr.data
+        converted = convert(original)
+        return arr if converted is original else arr.copy(deep=False, data=converted)
+
+    original_data = {name: var.data for name, var in arr.data_vars.items()}
+    converted_data = {name: convert(data) for name, data in original_data.items()}
+    if all(converted_data[name] is data for name, data in original_data.items()):
+        return arr
+    return arr.copy(deep=False, data=converted_data)
+
+
+def to_device(arr: Any, *, lazy: bool = False) -> Any:
     """Move numerical data to Dask's selected backend without computing chunks.
 
     Xarray coordinates and attributes stay on the CPU. NumPy inputs are returned
-    unchanged under the default backend; Dask transfers are lazy and idempotent.
+    unchanged under the default backend. Dask transfers are lazy and idempotent.
+    With ``lazy=True``, eager host arrays that need uploading are wrapped in Dask
+    arrays first. CuPy-incompatible variable dtypes stay on the CPU.
     """
-    if isinstance(arr, xr.Dataset):
-        return arr.map(to_device, keep_attrs=True)
-    if isinstance(arr, xr.DataArray):
-        return arr.copy(data=to_device(arr.data))
+    if isinstance(arr, xr.DataArray | xr.Dataset):
+        return _convert_xarray(arr, lambda data: to_device(data, lazy=lazy))
     xp = get_xp()
+    if xp is np:
+        return to_host(arr)
+
+    dtype = getattr(arr, "dtype", None)
+    if dtype is not None and (
+        dtype.kind not in "biufc" or dtype.itemsize > (16 if dtype.kind == "c" else 8)
+    ):
+        return arr
     if isinstance(arr, da.Array):
         return arr.to_backend(xp.__name__)
-    return to_host(arr) if xp is np else xp.asarray(arr)
+    if lazy and isinstance(arr, np.ndarray):
+        return da.from_array(arr).to_backend(xp.__name__)
+    return xp.asarray(arr)
 
 
 def to_host(arr: Any) -> Any:
@@ -59,10 +86,8 @@ def to_host(arr: Any) -> Any:
     This conversion is independent of the current backend setting. It preserves
     lazy collections and Xarray metadata and does not import CuPy for NumPy data.
     """
-    if isinstance(arr, xr.Dataset):
-        return arr.map(to_host, keep_attrs=True)
-    if isinstance(arr, xr.DataArray):
-        return arr.copy(data=to_host(arr.data))
+    if isinstance(arr, xr.DataArray | xr.Dataset):
+        return _convert_xarray(arr, to_host)
     if isinstance(arr, da.Array):
         return arr.to_backend("numpy")
     if isinstance(arr, np.ndarray):

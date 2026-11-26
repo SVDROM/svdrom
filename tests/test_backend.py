@@ -37,7 +37,11 @@ def test_xarray_transfers_preserve_metadata(as_dataset: bool) -> None:
     original = xr.DataArray(
         da.arange(12, chunks=4).reshape((3, 4)),
         dims=("space", "time"),
-        coords={"space": ["a", "b", "c"], "time": np.arange(4)},
+        coords={
+            "space": ["a", "b", "c"],
+            "time": np.arange(4),
+            "latitude": ("space", np.arange(3, dtype=float)),
+        },
         name="temperature",
         attrs={"units": "K"},
     )
@@ -45,7 +49,10 @@ def test_xarray_transfers_preserve_metadata(as_dataset: bool) -> None:
         original = original.to_dataset()
         original.attrs["source"] = "test"
     with dask.config.set({"array.backend": "numpy"}):
-        result = _backend.to_host(_backend.to_device(original))
+        device = _backend.to_device(original)
+        result = _backend.to_host(original)
+    assert device is original, "Expected NumPy backend to reuse the Xarray object."
+    assert result is original, "Expected host transfer to reuse the Xarray object."
     assert result.chunks, "Expected the result to stay Dask-backed."
     xr.testing.assert_identical(result, original)
 

@@ -53,12 +53,17 @@ def test_device_and_host_transfers_preserve_laziness() -> None:
     source = weather_matrix("float32")
     with dask.config.set({"array.backend": "cupy"}):
         assert get_xp() is cp, "Expected the CuPy array module."
+        source = source.assign_coords(latitude=("space", np.arange(64, dtype=float)))
         device = to_device(source)
         assert isinstance(device.data._meta, cp.ndarray), "Expected GPU chunk metadata."
         assert (
             to_device(device.data) is device.data
         ), "Expected idempotent GPU transfer."
         host = to_host(device)
+        for converted in (device, host):
+            assert np.shares_memory(
+                source.latitude.data, converted.latitude.data
+            ), "Expected data transfers to share CPU coordinate buffers."
         assert isinstance(
             host.data._meta, np.ndarray
         ), "Expected lazy CPU output chunks."
@@ -74,31 +79,130 @@ def test_device_and_host_transfers_preserve_laziness() -> None:
 
 
 @pytest.mark.parametrize("staged", [None, False, True])
+@pytest.mark.parametrize("eager", [False, True])
 def test_randomized_gpu_staging_default(
-    staged: bool | None, monkeypatch: pytest.MonkeyPatch
+    staged: bool | None, eager: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """GPU staging is memory-conscious by default and respects an explicit override."""
-    original = da.linalg.svd_compressed
-    settings = []
+    original = da.linalg.compression_matrix
+    settings: list[object] = []
 
-    def compressed(*args: object, **kwargs: object) -> tuple:
+    def compressed(*args: object, **kwargs: object) -> da.Array:
         settings.append(kwargs.get("compute"))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(da.linalg, "svd_compressed", compressed)
+    monkeypatch.setattr(da.linalg, "compression_matrix", compressed)
     options = {} if staged is None else {"compute": staged}
     with dask.config.set({"array.backend": "cupy"}):
         model = TruncatedSVD(
-            3, algorithm="randomized", compute_u=False, compute_v=False
+            3,
+            algorithm="randomized",
+            compute_u=eager,
+            compute_v=eager,
+            compute_var_ratio=eager,
         ).fit(weather_matrix("float32"), seed=42, **options)
     assert settings == [
         True if staged is None else staged
     ], "Expected default staging with explicit override support."
-    assert isinstance(model.u.data, da.Array), "Expected deferred left vectors."
-    assert isinstance(model.v.data, da.Array), "Expected deferred right vectors."
+    output_type = np.ndarray if eager else da.Array
+    assert isinstance(model.u.data, output_type), "Expected requested left vector type."
+    assert isinstance(
+        model.v.data, output_type
+    ), "Expected requested right vector type."
     assert isinstance(
         model.u.compute().data, np.ndarray
     ), "Expected deferred computation to produce CPU output."
+
+
+@pytest.mark.parametrize("algorithm", ["randomized", "covariance", "tsqr"])
+def test_deferred_pod_releases_gpu_intermediates(algorithm: str) -> None:
+    """Live CuPy allocations are released even while outputs stay deferred."""
+    pool = cp.get_default_memory_pool()
+    source = weather_matrix("float32")
+    model = POD(
+        3,
+        svd_algorithm=algorithm,
+        compute_modes=False,
+        compute_time_coeffs=False,
+        compute_energy_ratio=False,
+    )
+    options = (
+        {"seed": 42, "n_power_iter": 1, "iterator": "QR"}
+        if algorithm == "randomized"
+        else {}
+    )
+    baseline = pool.used_bytes()
+    for _ in range(2):
+        with dask.config.set({"array.backend": "cupy"}):
+            model.fit(source, **options)
+        cp.cuda.runtime.deviceSynchronize()
+        assert (
+            pool.used_bytes() == baseline
+        ), "Expected fit to release live GPU buffers."
+        for result in (
+            model.u.data,
+            model.v.data,
+            model.time_coeffs.data,
+            model.explained_energy_ratio,
+        ):
+            assert isinstance(result, da.Array), "Expected a deferred result."
+            assert isinstance(result.compute(), np.ndarray), "Expected NumPy outputs."
+        cp.cuda.runtime.deviceSynchronize()
+        assert (
+            pool.used_bytes() == baseline
+        ), "Expected evaluation to release live GPU buffers."
+
+
+def test_covariance_rejects_matrix_larger_than_gpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject a covariance matrix that could never fit before scheduling tasks."""
+    monkeypatch.setattr(cp.cuda.runtime, "memGetInfo", lambda: (100, 100))
+    source = weather_matrix("float32")
+    tasks = []
+    with (
+        dask.config.set({"array.backend": "cupy"}),
+        Callback(pretask=lambda key, *_args: tasks.append(key)),
+        pytest.raises(MemoryError, match="exceeding GPU capacity.*Use randomized POD"),
+    ):
+        POD(3, svd_algorithm="covariance").fit(source)
+    assert not tasks, "Expected a capacity error before any input computation."
+
+
+@pytest.mark.parametrize(("iterator", "coerce_signs"), [("power", True), ("QR", False)])
+def test_host_basis_matches_dask_staged_svd(iterator: str, coerce_signs: bool) -> None:
+    """Host persistence preserves Dask's approximate factors and sign option."""
+    rng = np.random.default_rng(12)
+    source = xr.DataArray(
+        da.from_array(rng.normal(size=(48, 36)), chunks=(12, 9)),
+        dims=("space", "time"),
+    )
+    options = {
+        "seed": 42,
+        "iterator": iterator,
+        "n_power_iter": 1,
+        "n_oversamples": 17,
+        "coerce_signs": coerce_signs,
+    }
+    with dask.config.set({"array.backend": "cupy"}):
+        reference = dask.compute(
+            *map(
+                to_host,
+                da.linalg.svd_compressed(
+                    to_device(source.data), 5, compute=True, **options
+                ),
+            )
+        )
+        model = TruncatedSVD(5, algorithm="randomized").fit(source, **options)
+    for actual, expected in zip(
+        (model.u.data, model.s, model.v.data), reference, strict=True
+    ):
+        np.testing.assert_allclose(
+            actual,
+            expected,
+            atol=1e-10,
+            err_msg="Expected host checkpoints to preserve the Dask factorization.",
+        )
 
 
 @pytest.mark.parametrize("algorithm", ["tsqr", "randomized"])
@@ -265,6 +369,32 @@ def test_scaler_gpu_matches_cpu(as_dataset: bool, with_std: bool) -> None:
         assert isinstance(variable.data, np.ndarray), "Expected CPU-stored means."
     if with_std:
         xr.testing.assert_allclose(gpu_scaler.std, cpu_scaler.std)
+
+
+@pytest.mark.parametrize("with_std", [False, True])
+@pytest.mark.parametrize("chunked", [False, True])
+def test_scaler_preserves_cpu_behaviour_for_mixed_dataset(
+    with_std: bool, chunked: bool
+) -> None:
+    """CuPy scales numeric data while preserving Xarray's rules for other dtypes."""
+    source = xr.Dataset(
+        {"air": weather_matrix("float32"), "label": ("time", ["a", "b"] * 12)}
+    )
+    if not with_std:
+        source["timestamp"] = ("time", np.datetime64("2020-01-01") + np.arange(24))
+    source = source.chunk({"time": 6}) if chunked else source.compute()
+    cpu = StandardScaler()
+    gpu = StandardScaler()
+    expected = cpu(source, with_std=with_std)
+    with dask.config.set({"array.backend": "cupy"}):
+        actual = gpu(source, with_std=with_std)
+    xr.testing.assert_allclose(actual.compute(), expected.compute(), atol=1e-6)
+    xr.testing.assert_allclose(gpu.mean, cpu.mean, atol=1e-6)
+    if with_std:
+        xr.testing.assert_allclose(gpu.std, cpu.std, atol=1e-6)
+    assert isinstance(
+        actual.air.data, da.Array if chunked else np.ndarray
+    ), "Expected the scaler to preserve eager and lazy numerical output types."
 
 
 def test_cupy_config_and_numpy_dmd_handoff() -> None:

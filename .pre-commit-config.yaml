@@ -45,7 +45,9 @@ repos:
           - pydmd
           - pandas
           - pandas-stubs
-          - weatherbench2 @ git+https://github.com/google-research/weatherbench2.git
+          - numpy==2.4.6; python_version >= '3.11'
+          - numpy==2.2.6; python_version < '3.11'
+          - weatherbench2 @ git+https://github.com/google-research/weatherbench2.git@8b55eb3680a4862565fdbffd26dec76201fdad2d
 
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
