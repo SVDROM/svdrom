@@ -107,6 +107,14 @@ def test_standard_scaler(X: xr.DataArray | xr.Dataset):
             xr.testing.assert_allclose(X, X_scaled + scaler.mean)
 
 
+@pytest.mark.parametrize("dtype", ["datetime64[s]", "timedelta64[s]"])
+def test_standard_scaler_rejects_standard_deviation_for_dates(dtype: str) -> None:
+    """Temporal variables report which scaling options are supported."""
+    source = xr.DataArray(np.arange(4).astype(dtype), dims="time")
+    with pytest.raises(TypeError, match="with_std=False or select numerical variables"):
+        StandardScaler()(source, with_std=True)
+
+
 @pytest.mark.parametrize("generator", [data_generator, signal_generator])
 @pytest.mark.parametrize("d", [2, 3])
 def test_hankel_preprocessing(generator: DataGenerator | SignalGenerator, d: int):
