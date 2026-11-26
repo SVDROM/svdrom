@@ -4,6 +4,7 @@ import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
+from dask.utils import format_bytes
 
 from svdrom._backend import get_xp, to_device, to_host
 from svdrom.logger import setup_logger
@@ -162,13 +163,14 @@ class POD(TruncatedSVD):
         """
         if X.dims.index(self._time_dim) != 1:
             X = X.T
-        X = to_device(X)
         if self._remove_mean:
             scaler = StandardScaler()
             scaled = scaler._scale(X, dim=self._time_dim)
             assert isinstance(scaled, xr.DataArray), "Expected DataArray after scaling."
             X = scaled
             self._mean = scaler._mean
+        else:
+            X = to_device(X)
         n_snapshots = X.sizes[self._time_dim]
         self._scale_factor = n_snapshots**0.5
         return X / self._scale_factor
@@ -184,32 +186,31 @@ class POD(TruncatedSVD):
         eigenvalues, eigenvectors = xp.linalg.eigh(covariance)
         order = xp.argsort(eigenvalues)[::-1][: self._n_components]
         eigenvalues = xp.maximum(eigenvalues[order], 0)
-        modes = eigenvectors[:, order]
-        singular_values = xp.sqrt(eigenvalues)
+        modes = to_host(eigenvectors[:, order])
+        singular_values = to_host(xp.sqrt(eigenvalues))
 
         total_energy = float(xp.trace(covariance).real)
         if total_energy <= 0:
             msg = "POD covariance has zero total energy."
             raise ValueError(msg)
 
-        safe_values = xp.where(singular_values > 0, singular_values, xp.inf)
+        safe_values = np.where(singular_values > 0, singular_values, np.inf)
         modes_lazy = da.from_array(modes)
         output_dtype = np.result_type(values.dtype, np.float32)
         temporal_vectors = (
-            (modes_lazy.conj().T @ precise_values) / safe_values[:, None]
+            (to_device(modes_lazy).conj().T @ precise_values)
+            / to_device(safe_values[:, None], lazy=True)
         ).astype(output_dtype)
 
         mode_values = modes if self._compute_u else modes_lazy
-        self._u = self._singular_vectors_to_dataarray(to_host(mode_values), X, kind="u")
-        self._s = to_host(singular_values)
+        self._u = self._singular_vectors_to_dataarray(mode_values, X, kind="u")
+        self._s = singular_values
         self._v = self._singular_vectors_to_dataarray(
             to_host(temporal_vectors), X, kind="v"
         )
-        ratios = eigenvalues / total_energy
+        ratios = to_host(eigenvalues / total_energy)
         self._explained_var_ratio = (
-            to_host(ratios)
-            if self._compute_var_ratio
-            else to_host(da.from_array(ratios))
+            ratios if self._compute_var_ratio else da.from_array(ratios)
         )
 
     def fit(
@@ -228,9 +229,10 @@ class POD(TruncatedSVD):
             Additional keyword arguments to pass to the randomized
             SVD algorithm used as a backend for the POD computation.
             See dask.array.linalg.svd_compressed for more details.
-            CuPy defaults to ``compute=True`` to recompute input between
-            passes and reduce memory retention; ``compute=False`` overrides it.
-            Output laziness is controlled by the constructor flags.
+            CuPy defaults to ``compute=True`` to limit peak GPU memory during
+            randomized SVD. Reduced intermediates are computed during fitting.
+            For deferred outputs, the compression basis is cached in host memory.
+            An explicit ``compute=False`` disables staging.
             The covariance algorithm accepts no additional arguments.
         """
         if self._time_dim not in X.dims:
@@ -253,9 +255,22 @@ class POD(TruncatedSVD):
             logger.error(msg)
             raise ValueError(msg)
 
-        if self._algorithm == "covariance" and kwargs:
-            msg = "The covariance POD algorithm does not accept SVD keyword arguments."
-            raise TypeError(msg)
+        if self._algorithm == "covariance":
+            if kwargs:
+                msg = "Covariance POD does not accept SVD keyword arguments."
+                raise TypeError(msg)
+            xp = get_xp()
+            if xp is not np:
+                dtype = np.result_type(X.dtype, np.float64)
+                covariance_bytes = n_spatial_points**2 * dtype.itemsize
+                _, device_capacity = xp.cuda.runtime.memGetInfo()
+                if covariance_bytes > device_capacity:
+                    msg = (
+                        f"The spatial covariance matrix alone requires "
+                        f"{format_bytes(covariance_bytes)}, exceeding GPU capacity "
+                        f"({format_bytes(device_capacity)}). Use randomized POD."
+                    )
+                    raise MemoryError(msg)
 
         X = self._preprocess_array(X)
         if self._algorithm == "covariance":
@@ -407,7 +422,7 @@ class POD(TruncatedSVD):
                 )
                 raise ValueError(msg)
 
-        C = to_device(C)
+        C = to_device(C, lazy=not compute)
         C_prime = C - C.mean(dim=self._time_dim) if remove_mean else C
 
         energy_denominator = self._s**2
@@ -416,7 +431,8 @@ class POD(TruncatedSVD):
         if isinstance(C_prime.data, da.Array):
             coefficients = coefficients.chunk()
         chi = (C_prime @ to_device(coefficients).T) / (
-            self._scale_factor * to_device(energy_denominator)
+            self._scale_factor
+            * to_device(energy_denominator, lazy=isinstance(C_prime.data, da.Array))
         )
         chi = to_host(chi)
 
@@ -465,25 +481,25 @@ class POD(TruncatedSVD):
         self._check_is_fitted(["_u"])
         assert self._u is not None  # needed for mypy checks
 
-        X = to_device(X)
+        X = to_device(X, lazy=not compute)
         # Apply same preprocessing as during fit()
         if X.dims.index(self._time_dim) != 1:
             X = X.T
         if self._remove_mean:
             self._check_is_fitted(["_mean"])
             assert self._mean is not None  # needed for mypy checks
-            X = X - to_device(self._mean)
+            X = X - to_device(self._mean, lazy=isinstance(X.data, da.Array))
         assert self._scale_factor is not None
         X = X / self._scale_factor
 
         # Project onto POD modes (proper POD projection)
         # Use the Hermitian transpose so complex projections match fit().
-        modes = to_device(self._u)
+        modes = self._u
         if (not compute or isinstance(X.data, da.Array)) and not isinstance(
             modes.data, da.Array
         ):
             modes = modes.chunk()
-        result = to_host(modes.conj().T @ X)
+        result = to_host(to_device(modes).conj().T @ X)
         return result.compute() if compute else result
 
     def reconstruct(
