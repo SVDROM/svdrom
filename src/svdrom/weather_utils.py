@@ -388,13 +388,13 @@ def compute_crps_gaussian(
     Parameters
     ----------
     ground_truth: xr.DataArray
-        The ground truth data. Must be a numpy-backed array.
+        A dask- or numpy-backed DataArray containing the ground truth data.
     prediction_mean: xr.DataArray
-        The mean of the predictions ensemble. Must be a
-        numpy-backed array.
+        A dask- or numpy-backed DataArray containing the mean of the
+        predictions ensemble.
     prediction_std: xr.DataArray
-        The standard deviation of the predictions ensemble.
-        Must be a numpy-backed array.
+        A dask- or numpy-backed DataArray containing the standard deviation
+        of the predictions ensemble.
     lat_weights: bool, optional
         Whether to apply a weighting function so that spatial locations
         in a lat/lon grid closer to the Equator receive a larger weight
@@ -408,24 +408,17 @@ def compute_crps_gaussian(
     Returns
     -------
     xr.DataArray:
-        The Continuous Ranked Probability Score as a numpy-backed array.
+        The Continuous Ranked Probability Score, dask-backed if any input is
+        dask-backed, otherwise numpy-backed.
 
     Notes
     -----
-    The function does not currently support dask-backed arrays. All input
-    arrays must be numpy-backed. CRPS is calculated using crps_gaussian() from
-    the properscoring library: https://github.com/properscoring/properscoring
+    CRPS is calculated using crps_gaussian() from the properscoring library:
+    https://github.com/properscoring/properscoring
+    For dask-backed inputs, the positivity check on prediction_std triggers
+    a computation of a scalar reduction.
     """
-
-    for arr in (ground_truth, prediction_mean, prediction_std):
-        if not isinstance(arr.data, np.ndarray):
-            msg = (
-                "The input DataArray must be numpy-backed. "
-                "Call .compute() to materialize it in memory."
-            )
-            raise ValueError(msg)
-
-    if (prediction_std.values <= 0.0).any():
+    if bool((prediction_std <= 0.0).any()):
         msg = (
             "The prediction standard deviation array must only contain positive values."
         )
@@ -456,6 +449,8 @@ def compute_crps_gaussian(
         prediction_mean,
         prediction_std,
         join="exact",
+        dask="parallelized",
+        output_dtypes=[float],
     )
 
     if lat_weighting and dims is not None:
