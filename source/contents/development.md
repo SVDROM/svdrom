@@ -22,11 +22,15 @@ uv run make help
 
 ## Testing
 
-Use pytest to run the unit checks:
+Install the same extras used by the CPU test jobs and run the unit checks:
 
 ```bash
-uv run pytest
+uv sync --extra dev --extra weather
+uv run --no-sync pytest
 ```
+
+For a GPU test environment, also select ``--extra gpu`` when syncing. The GPU
+tests skip when CuPy is absent or no CUDA device is available.
 
 ## Coverage
 
