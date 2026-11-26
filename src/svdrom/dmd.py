@@ -8,9 +8,9 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 from dask.utils import parse_bytes
-from pydmd import BOPDMD
 
 import svdrom.config as config
+from svdrom._vendor.pydmd import BOPDMD
 from svdrom.logger import setup_logger
 from svdrom.svdrom_base import DecompositionModel
 

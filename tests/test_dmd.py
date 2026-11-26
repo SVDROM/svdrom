@@ -8,11 +8,13 @@ import numpy as np
 import pytest
 import xarray as xr
 from make_test_data import DataGenerator, SignalGenerator
-from pydmd import BOPDMD
-from pydmd.preprocessing import hankel_preprocessing as hankel_preprocessing_pydmd
 
 import svdrom.config as config
 from svdrom import OptDMD, TruncatedSVD
+from svdrom._vendor.pydmd import BOPDMD
+from svdrom._vendor.pydmd.preprocessing import (
+    hankel_preprocessing as hankel_preprocessing_pydmd,
+)
 from svdrom.preprocessing import hankel_preprocessing
 
 # set the dask scheduler to single-threaded
