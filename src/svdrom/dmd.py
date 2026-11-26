@@ -606,7 +606,7 @@ class OptDMD(DecompositionModel):
         if config.get("array_backend") == "cupy":
             warnings.warn(
                 "OptDMD runs on the CPU: PyDMD's BOPDMD requires NumPy/SciPy. "
-                "Computed input factors will be transferred to NumPy.",
+                "Any GPU-backed input factors will be converted to NumPy.",
                 UserWarning,
                 stacklevel=2,
             )
