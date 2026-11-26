@@ -76,7 +76,7 @@ The preprocessing module provides utilities for preparing data before SVD or DMD
             scaler = StandardScaler()
             X_scaled = scaler(X, dim="time", with_std=True)
 
-.. py:function:: hankel_preprocessing(X, d=2)
+.. py:function:: hankel_preprocessing(X, d=2, memory_limit_bytes=1e9)
 
     Perform Hankel (time-delay) embedding on a 2-D DataArray.
 
@@ -86,12 +86,14 @@ The preprocessing module provides utilities for preparing data before SVD or DMD
     :type X: xarray.DataArray
     :param d: Hankel matrix rank. Must be an integer :math:`\geq 2`. Default is ``2``.
     :type d: int
+    :param memory_limit_bytes: The memory threshold for the estimated output size, ``X.nbytes * d``. If a NumPy-backed input exceeds this limit, it is wrapped with ``da.from_array`` and the result is a lazy, Dask-backed DataArray. Default is ``1e9`` (1 GB).
+    :type memory_limit_bytes: float
     :returns: The augmented data matrix with dimensions :math:`((m \cdot d) \times (n - d + 1))`. The returned DataArray has a new coordinate indicating the time-delay lag relative to the current timestamp. It also contains a new attribute (a dictionary) that maps each original snapshot to a tuple consisting of the first time-delay embedded snapshot in which it appears and the corresponding lag index.
     :rtype: xarray.DataArray
 
     .. rubric:: Notes
 
-    - If the input DataArray is NumPy-backed, the returned DataArray is also NumPy-backed. If it is Dask-backed, the returned DataArray is also Dask-backed.
+    - A NumPy-backed input returns NumPy-backed output only if the estimated output size is less than or equal to ``memory_limit_bytes``; otherwise, the result is Dask-backed. A Dask-backed input always returns Dask-backed output.
     - The name of the lag coordinate is controlled by the ``"hankel_coord_name"`` config key (default: ``"hankel_lag"``).
     - The attribute storing the time mapping is named according to the ``"hankel_time_mapping_attr"`` config key (default: ``"hankel_time_mapping"``).
 
