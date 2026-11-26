@@ -265,13 +265,13 @@ def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArra
     -------
     xr.DataArray:
         The climatology with the dayofyear and hour dimensions converted into a
-        single time dimension. The output DataArray is numpy-backed.
+        single time dimension. The output is dask-backed if the input is
+        dask-backed, and numpy-backed otherwise.
 
     Notes
     -----
-    If the input DataArray is dask-backed, the function will trigger the computation
-    of the underlying task graph and load the data into memory, so be mindful about
-    the size of the input DataArray.
+    This function preserves laziness for dask-backed input. Call ``.compute()`` on
+    the result if an in-memory array is needed.
     """
     if "dayofyear" not in climatology.dims or "hour" not in climatology.dims:
         msg = (
@@ -279,7 +279,6 @@ def expand_time_climatology(climatology: xr.DataArray, year: int) -> xr.DataArra
             "'dayofyear' and 'hour'."
         )
         raise ValueError(msg)
-    climatology = climatology.compute()
     times = pd.date_range(f"{year}-01-01", f"{year}-12-31 23:00", freq="1h")
     times = times[
         times.dayofyear.isin(climatology.dayofyear.values)
