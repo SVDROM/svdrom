@@ -11,6 +11,7 @@ from dask.utils import parse_bytes
 from pydmd import BOPDMD
 
 import svdrom.config as config
+from svdrom._backend import to_host
 from svdrom.logger import setup_logger
 from svdrom.svdrom_base import DecompositionModel
 
@@ -602,6 +603,14 @@ class OptDMD(DecompositionModel):
         matrix, 'u', 's' and 'v' must come from the singular value decomposition
         of the Hankel pre-processed matrix via the TruncatedSVD class.
         """
+        if config.get("array_backend") == "cupy":
+            warnings.warn(
+                "OptDMD runs on the CPU: PyDMD's BOPDMD requires NumPy/SciPy. "
+                "Any GPU-backed input factors will be converted to NumPy.",
+                UserWarning,
+                stacklevel=2,
+            )
+        u, s, v = to_host(u), to_host(s), to_host(v)
         self._check_svd_inputs(u, s, v)
         if self._n_components > len(s):
             msg = (

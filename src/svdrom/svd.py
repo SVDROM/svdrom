@@ -4,13 +4,49 @@ import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
+from dask.array.utils import svd_flip
+from dask.base import wait
 from dask.utils import parse_bytes
 
 import svdrom.config as config
+from svdrom._backend import to_device, to_host
 from svdrom.logger import setup_logger
 from svdrom.svdrom_base import DecompositionModel
 
 logger = setup_logger("SVD", "svd.log")
+
+
+def _staged_svd_with_host_basis(
+    values: da.Array,
+    rank: int,
+    *,
+    iterator: str = "power",
+    n_power_iter: int = 0,
+    n_oversamples: int = 10,
+    seed: object = None,
+    coerce_signs: bool = True,
+) -> tuple[da.Array, da.Array, da.Array]:
+    """Build deferred factors using Dask's compression basis cached on the host."""
+    basis = da.linalg.compression_matrix(
+        values,
+        rank,
+        iterator=iterator,
+        n_power_iter=n_power_iter,
+        n_oversamples=n_oversamples,
+        seed=seed,
+        compute=True,
+    )
+    # Store the reduced basis chunk by chunk before building the factor graphs.
+    # Their later GPU computations can upload these host chunks again as needed.
+    host_basis = to_host(basis).persist()
+    wait(host_basis)
+    device_basis = to_device(host_basis)
+    v, s, small_u_t = da.linalg.svd((device_basis @ values).T, coerce_signs=False)
+    u = device_basis.T @ small_u_t[:rank].T
+    v = v[:, :rank].T
+    if coerce_signs:
+        u, v = svd_flip(u, v)
+    return u, s[:rank], v
 
 
 class TruncatedSVD(DecompositionModel):
@@ -290,6 +326,12 @@ class TruncatedSVD(DecompositionModel):
             Additional keyword arguments to pass to the
             randomized SVD algorithm. See
             `dask.array.linalg.svd_compressed` for more details.
+            On CuPy, ``compute=True`` by default stages the randomized SVD to
+            reduce peak device memory during fitting. It computes reduced
+            intermediates eagerly. If any output is deferred, the compression
+            basis is stored in host memory and uploaded by chunk on demand.
+            The final outputs still follow the constructor's compute flags.
+            Pass ``compute=False`` to use a single Dask graph when it fits.
         """
         if self._algorithm not in ["tsqr", "randomized"]:
             msg = (
@@ -300,7 +342,7 @@ class TruncatedSVD(DecompositionModel):
             raise ValueError(msg)
 
         self._check_array(X)
-        X_da = X.data
+        X_da = to_device(X.data)
 
         if self._algorithm == "tsqr":
             msg = "Will use TSQR algorithm."
@@ -314,9 +356,24 @@ class TruncatedSVD(DecompositionModel):
             msg = "Will use randomized algorithm."
             logger.info(msg)
             X_da = self._rechunk_array(X_da) if self._rechunk else X_da
-            u, s, v = da.linalg.svd_compressed(X_da, self._n_components, **kwargs)
+            gpu = config.get("array_backend") == "cupy"
+            deferred = not (
+                self._compute_u and self._compute_v and self._compute_var_ratio
+            )
+            if gpu and kwargs.setdefault("compute", True) and deferred:
+                kwargs.pop("compute")
+                u, s, v = _staged_svd_with_host_basis(
+                    X_da, self._n_components, **kwargs
+                )
+            else:
+                u, s, v = da.linalg.svd_compressed(X_da, self._n_components, **kwargs)
 
         explained_var_ratio = self._compute_explained_var_ratio(X_da, u, s)
+
+        # Download each final block before Dask gathers it, including deferred
+        # results. Internal decomposition tasks continue to execute on the GPU.
+        u, s, v = to_host(u), to_host(s), to_host(v)
+        explained_var_ratio = to_host(explained_var_ratio)
 
         results = []
         results.append(s)
@@ -409,12 +466,12 @@ class TruncatedSVD(DecompositionModel):
             )
             logger.error(msg)
             raise ValueError(msg)
-        X_da = X.data
+        X_da = to_device(X.data)
         try:
             msg = "Computing transformation..."
             logger.info(msg)
-            X_da_transformed = X_da.dot(self._v.data.T)
-            X_da_transformed = X_da_transformed.compute()
+            X_da_transformed = X_da.dot(to_device(self._v.data).T)
+            X_da_transformed = to_host(X_da_transformed).compute()
             msg = "Done."
             logger.info(msg)
         except ValueError as e:

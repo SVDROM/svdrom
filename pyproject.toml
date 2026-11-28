@@ -35,6 +35,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gpu = [
+  "cupy-cuda12x >=13; sys_platform == 'linux' or sys_platform == 'win32'",
+]
 dev = [
   "pytest >=6",
   "pytest-cov >=3",
